@@ -1,0 +1,11 @@
+provare ad aggiungere feature da tenere
+
+
+possibili features: 
+    cos'è "D_SALES_LIST_SALES_T_AUDIENCE_SUB_CAT_ID"
+    CONSIDERARE DATI SU STESSI SPETTACOLI UGUALI FATTI ANNI PRECEDENTI
+    CONSIDERARE LA PERFORMANCE CHE NUMERO DI REPLICA è DI QUELL'ANNO, DARE DATI SU REPLICA ANALOGA ANNI SCORSI
+
+fare fillna con 0 per moving avarages?
+valutare diversi valori medie mobili
+dare valori puntuali diversi
