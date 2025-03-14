@@ -1,11 +1,15 @@
 import pandas as pd
 from utils.logger import setup_logger
+import os
+from dotenv import load_dotenv, find_dotenv
+import matplotlib.pyplot as plt
+import time
 logger = setup_logger(__name__, level="INFO")
 
 
-def convert_data(sales_db):
-    sales_db["gain"] = sales_db["gain"].str.replace(",",".")
-    sales_db = sales_db.astype({
+def convert_data(df):
+    df["gain"] = df["gain"].str.replace(",",".")
+    df = df.astype({
         "individuali_gruppi": str,
         "online_offline": str,
         "gain": float,
@@ -13,8 +17,8 @@ def convert_data(sales_db):
         "season_id": int,
         "performance_id": int,
     })
-    sales_db['data'] = pd.to_datetime(sales_db['data'], format='%Y-%m-%d')
-    return sales_db
+    df["date"] = pd.to_datetime(df["date"], format='%d/%m/%Y')
+    return df
 
 def one_hot_encode(df, column_names: list[str]):
     encoded_col_names = []
@@ -41,7 +45,6 @@ def add_moving_avarages(df, column_names: list[str], periods: list[int]):
     for period in periods:
         for col_name in column_names:
             col_name = col_name+"_cum_sum"
-            print(col_name+"_cum_sum")
             df[col_name+f"{period}d_avg"] = df[col_name].rolling(period).mean()
             df = df.fillna(df[col_name].iloc[0])
     return df
@@ -62,7 +65,7 @@ def get_sales(path: str):
         "D_SALES_LIST_SALES_Tipologia_canale": "online_offline",
         "D_SALES_LIST_SALES_TOTAL_CURRENT_AMT_ITX": "gain",
         "D_SALES_LIST_SALES_CURRENT_QUANTITY": "numero_biglietti",
-        "D_SALES_LIST_SALES_REFERENCE_DATE": "data",
+        "D_SALES_LIST_SALES_REFERENCE_DATE": "date",
         "D_SALES_LIST_SALES_T_SEASON_ID": "season_id",
         "D_SALES_LIST_SALES_T_PERFORMANCE_ID": "performance_id",
     })
@@ -71,7 +74,7 @@ def get_sales(path: str):
                             "online_offline",
                             "gain",
                             "numero_biglietti",
-                            "data",
+                            "date",
                             "season_id",
                             "performance_id",
                             ]
@@ -100,17 +103,13 @@ def get_sales(path: str):
     # keep only the coulmns needed
     sales_db = sales_db[colonne_da_mantenere]
 
-    #converting each column to the right value
-    sales_db['data'] = pd.to_datetime(sales_db['data'], format='%d/%m/%Y')
     return sales_db
 
 def adding_performance_info(df, performance_id):
     performances_db = pd.read_csv(path+"\\D_CONFIG_PROD_LIST.csv", index_col=False)
     performances_db["D_CONFIG_PROD_LIST_T_PERFORMANCE_ID"] = performances_db["D_CONFIG_PROD_LIST_T_PERFORMANCE_ID"].astype(int)
-    print("ID",performance_id)
-    print(performances_db["D_CONFIG_PROD_LIST_T_PERFORMANCE_ID"])
     performance_row = performances_db[performances_db["D_CONFIG_PROD_LIST_T_PERFORMANCE_ID"]==performance_id]
-    print("PERFORMANCE_ROW", performance_row)
+
     performance_state = performance_row["D_CONFIG_PROD_LIST_PERFORMANCE_STATE"].iloc[0]
     performance_type = performance_row["D_CONFIG_PROD_LIST_Tipologia_spettacolo"].iloc[0]
     performance_space = performance_row["D_CONFIG_PROD_LIST_SPACE"].iloc[0]
@@ -128,89 +127,107 @@ def adding_performance_info(df, performance_id):
         df["performance_type"] = performance_row["D_CONFIG_PROD_LIST_Tipologia_spettacolo"].iloc[0]
         return df
     else:
-        return None
+        return pd.DataFrame()
 
-def create_dataset(cleaned_sales, db_start_end_season):
-    # raggruppo le 
-    start_date = None
+def create_model_input(cleaned_sales, season_df, train_dim = 0.6, validation_dim = 0.2, test_dim = 0.2):
     end_date = None
-    for performance_id, group in cleaned_sales.groupby('performance_id'):
+    train_df = pd.DataFrame()
+    validation_df = pd.DataFrame()
+    test_df = pd.DataFrame()
 
+    cleaned_sales = cleaned_sales.sort_values(by="date")
+    groups = cleaned_sales.groupby('performance_id')
+
+    i=0
+    counter=0
+    len_=len(groups)
+    tr=False
+    val=False
+    for performance_id, group in groups:
+        i+=1
+        counter+=1
         #get start and end season date
-        if start_date == None:
-            group_season = group["season_id"].iloc[0]
-            season_row = db_start_end_season[(db_start_end_season["season_id"]) == group_season]
-            start_date = season_row["first_ticket_sold"].iloc[0]
-            end_date = season_row["last_ticket_sold"].iloc[0]
+        group_season = group["season_id"].iloc[0]
+        season_row = season_df[(season_df["season_id"]) == group_season]
+        start_date = season_row["inizio_vendite"].iloc[0]
+        end_date = season_row["fine_vendite"].iloc[0]
 
+        group = group.sort_values(by="date")
 
-        #PER ORA IPOTIZIAMO CHE LE VENDITE APRANO IL GIORNO DELLA PRIMA TRANSAZIONE
-        #cacolo la distanza in giorni dal primo giorno d'acquisto e dall'ultimo
-        group["start_season_distance"] = (group["data"]-start_date).dt.days
-        group["end_season_distance"] = -(group["data"]-end_date).dt.days
-        group = group.drop(columns=["data", 
-                                    "season_id", 
-                                    "performance_id"])
-        group = adding_performance_info(group, performance_id)
-        #faccio one hot encoding delle seguenti colonne:
-        columns_to_encode = [
-            "individuali_gruppi", #se chi ha acquistato è individuale o gruppo
-            "online_offline", #se comprato offline o online
-            "performance_type"
-        ]
-        group, encoded_col_names = one_hot_encode(group, column_names=columns_to_encode)
-        columns_to_cum_sum = ["gain", #prezzi 
-                             "numero_biglietti", #numero biglietti
-                            ]
+        #rimuovo features che non mi servono
+        group = group.drop(columns=["individuali_gruppi","online_offline", "numero_biglietti"])
+        group = group.groupby(['date', 'season_id', 'performance_id'], as_index=False).sum()
         
-        # calcolo la somma cumulata di: 
-        #   numero di persone che hanno comprato offline
-        #   numero di gruppi che hanno comprato
-        #   numero biglietti acquistati
-        #   gain
-        group = add_cumulative_sum(group, column_names=encoded_col_names+columns_to_cum_sum)
+        #FEATURES:
+        # Distanza della transazione dall'inizio e dalla fine della stagione
+        group["start_season_distance"] = (group["date"]-start_date).dt.days.abs()
+        group["end_season_distance"] = (group["date"]-end_date).dt.days.abs()
 
-        group = group.rename(columns={
-        "category_Gruppi_cum_sum:": "category_gruppi_cum_sum",
-        "category_Individuali_cum_sum": "category_individuali_cum_sum",
-        "category_Offline_cum_sum:": "category_offline_cum_sum",
-        "category_Online_cum_sum": "category_online_cum_sum",
-    })
+        # Calcolo la cumulata del guadagno e del numero di biglietti venduti
+        group = add_cumulative_sum(group, column_names=["gain"])
 
-
+        # Aggiungo medie mobili con differenti periodi
         group = add_moving_avarages(group, ["gain"], [5,10,15,20,30,40,50])
+
+        # Aggiungo colonna target che il modello deve prevedere
         group["tomorrow_gain"] = group["gain_cum_sum"].shift(-1)
         group = group.iloc[:-1]
-        #calcolo medie mobili
-        print("\nFINAL DB:")
-        print_unique_values(group)
 
-        break
+        # Rimuovo feature che possono fare leakage
 
+        group = group.drop(columns=["gain_cum_sum"])
+        pd.set_option('display.max_columns', None)
 
-path = "C:\\Users\\te7carsinisc\\Downloads\\dati_piccolo_teatro"
-create_clean_sales = True
-create_sales_by_perfomance = True
+        if len(group)>30:
+            group.to_csv(path+f"\\performances\\{performance_id}.csv", date_format='%d/%m/%Y', index=False)
+            
+            #print(len(train_df)/total_data_points,len(validation_df)/total_data_points,len(test_df)/total_data_points)
+            print(counter/len_,train_dim,tr,val,)
+            if not tr:
+                train_df = pd.concat([train_df, group], ignore_index=True)
+                if counter/len_>train_dim:
+                    counter=0
+                    tr=True
+                print("tr")
 
-performances_db = pd.read_csv(path+"\\D_CONFIG_PROD_LIST.csv", index_col=False)
+            elif not val:
+                validation_df = pd.concat([validation_df, group], ignore_index=True)
+                if counter/len_>validation_dim:
+                    counter=0
+                    val=True
+                print("val")
 
-if create_clean_sales:
-    cleaned_sales = get_sales(path)
-    cleaned_sales = convert_data(cleaned_sales)
-    cleaned_sales.to_csv(path+"\\CLEANED_SALES.csv", index=False)
-else:
-    cleaned_sales = pd.read_csv(path+"\\CLEANED_SALES.csv", index_col=False)
+            elif tr and val:
+                test_df = pd.concat([test_df, group], ignore_index=True)
+                print("test")
 
-    cleaned_sales = convert_data(cleaned_sales)
+    return train_df, validation_df, test_df
 
-print("\nCLEANED DB:")
-print_unique_values(cleaned_sales)
+def prepare_data(path):
+    
+    # Eemove transaction (rows) and columns I don't need
+    sales_df = get_sales(path)
 
+    #Convert columns to the right data type
+    sales_df = convert_data(sales_df)
+    
+    # Ordering rows by date
+    sales_df = sales_df.sort_values(by="date")
 
-if create_sales_by_perfomance:
-    #get the first and last ticket sold for each season
-    db_start_end_season = cleaned_sales.groupby('season_id')['data'].agg(['min', 'max']).reset_index()
-    db_start_end_season.columns = ['season_id', 'first_ticket_sold', 'last_ticket_sold']
-    db_start_end_season['season_id'] = db_start_end_season['season_id'].astype(int)
+    # get seasons db
+    seasons_df = pd.read_csv(path+"\\stagioni.csv", index_col=False)
+    seasons_df["inizio_vendite"] = pd.to_datetime(seasons_df["inizio_vendite"], format='%d/%m/%Y')
+    seasons_df["fine_vendite"] = pd.to_datetime(seasons_df["fine_vendite"], format='%d/%m/%Y')
 
-    create_dataset(cleaned_sales, db_start_end_season)
+    # Create Model Input
+    train_df, validation_df, test_df = create_model_input(sales_df, seasons_df)
+    train_df.to_csv(path+"\\train_trend_prediciton.csv", date_format='%d/%m/%Y', index=False)
+    validation_df.to_csv(path+"\\validation_trend_prediciton.csv", date_format='%d/%m/%Y', index=False)
+    test_df.to_csv(path+"\\test_trend_prediciton.csv", date_format='%d/%m/%Y', index=False)
+
+if __name__ == "__main__":
+    
+    load_dotenv(find_dotenv())
+    path = os.getenv('FOLDER_PATH')
+
+    prepare_data(path)
