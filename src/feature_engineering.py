@@ -4,6 +4,7 @@ import os
 from dotenv import load_dotenv, find_dotenv
 import matplotlib.pyplot as plt
 import time
+import math
 logger = setup_logger(__name__, level="INFO")
 
 
@@ -24,7 +25,8 @@ def one_hot_encode(df, encoding_dict):
     for col_name in encoding_dict:
         values = encoding_dict[col_name]
         for value in values:
-            df[value.lower()] = (df[col_name] == value)
+            if str(value)!="nan":
+                df[value.lower()] = (df[col_name] == value).astype(int)
     return df
 
 def add_cumulative_sum(df, column_names: list[str]):
@@ -123,7 +125,7 @@ def adding_performance_info(df, performances_db, performance_id):
     ]
     if performance_state=="In esecuzione" and performance_type not in performances_to_not_consider and performance_space in spaces_to_consider:
         df["performance_type"] = performance_type
-        df["perfmormance_capacity"] = performance_capacity
+        df["performance_capacity"] = performance_capacity
         return df
     else:
         return pd.DataFrame()
@@ -136,8 +138,9 @@ def create_model_input(cleaned_sales, season_df, prediction_period, train_dim = 
     performances_db = pd.read_csv(path+"\\D_CONFIG_PROD_LIST.csv", index_col=False)
     performances_db["D_CONFIG_PROD_LIST_T_PERFORMANCE_ID"] = performances_db["D_CONFIG_PROD_LIST_T_PERFORMANCE_ID"].astype(int)
     encoding_dict = {
-            "performance_type": performances_db["D_CONFIG_PROD_LIST_T_PERFORMANCE_ID"].unique()
+            "performance_type": ['Internazionale', 'Ospitalità', 'Collaborazione', 'Produzione', 'Festival']
         }
+    print(performances_db["D_CONFIG_PROD_LIST_Tipologia_spettacolo"].unique())
     
     cleaned_sales = cleaned_sales.sort_values(by="date")
     groups = cleaned_sales.groupby('performance_id')
@@ -188,11 +191,11 @@ def create_model_input(cleaned_sales, season_df, prediction_period, train_dim = 
         group = group.iloc[:-prediction_period]
 
         # Rimuovo feature che possono fare leakage
-        group = group.drop(columns=["gain_cum_sum"])
-        group = adding_performance_info(group,performance_id)  
-        if not group.empty:
-            group = one_hot_encode(group, encoding_dict)
-
+        #group = adding_performance_info(group,performances_db,performance_id)  
+        #if not group.empty:
+        #    group = one_hot_encode(group, encoding_dict)
+        #    group = group.drop(columns=["performance_type"])
+            
         if len(group)>30:
             group.to_csv(path+f"\\performances\\{performance_id}_{prediction_period}_target.csv", date_format='%d/%m/%Y', index=False)
             
@@ -238,7 +241,7 @@ def prepare_data(path):
     seasons_df["fine_vendite"] = pd.to_datetime(seasons_df["fine_vendite"], format='%d/%m/%Y')
 
     # Create Model Input
-    train_df, validation_df, test_df = create_model_input(sales_df, seasons_df, prediction_period=7)
+    train_df, validation_df, test_df = create_model_input(sales_df, seasons_df, prediction_period=1)
 
 if __name__ == "__main__":
     

@@ -25,10 +25,10 @@ def prepare_data(df):
 
 def trend_error(df, model, start_offset, prediction_period, plot):
     performances = df['performance_id'].unique()
-    performances = [10228587005942, 10228587683694]
     abs_errors=[]
     i=0
     for performance_id in performances:
+        performance_id = random.choice(performances)
         i+=1
         print(i/len(performances))
         df_ = df.copy()
@@ -41,10 +41,17 @@ def trend_error(df, model, start_offset, prediction_period, plot):
         # Initial data needed to make the first prediction
         # The rows up to and including start_day are known data used for making the first prediction.
         input_gain = Y_test.head(start_offset).tolist()
+        first_row = X_test.iloc[0]
         start = int(X_test.iloc[0]["start_season_distance"])
         end = int(X_test.iloc[0]["end_season_distance"])
         start_distances = list(range(start, start + start_offset))
         end_distances = list(range(end, end - start_offset, -1))
+        #is_internazionale = first_row["internazionale"]
+        #is_ospitalita = first_row["ospitalità"]
+        #is_collaborazione = first_row["collaborazione"]
+        #is_produzione = first_row["produzione"]
+        #is_festival = first_row["festival"]
+        #performance_capacity = first_row["performance_capacity"]
 
         # So the first prediction will made for the start_day+1day
         predictions_rows = Y_test.loc[start_day+pd.Timedelta(days=1):end_date]
@@ -53,13 +60,20 @@ def trend_error(df, model, start_offset, prediction_period, plot):
             # Creating a DataFrame with all the features necessary for the model to make predictions
             input_df = pd.DataFrame({"gain_cum_sum": input_gain,
                                      "start_season_distance": start_distances,
-                                     "end_season_distance": end_distances})
+                                     "end_season_distance": end_distances,
+                                    # "internazionale":is_internazionale,
+                                    # "ospitalità":is_ospitalita,
+                                    # "collaborazione":is_collaborazione,
+                                    # "produzione":is_produzione, 
+                                    # "festival":is_festival,
+                                    # "performance_capacity":performance_capacity,
+                                     })
             input_df = add_moving_avarages(input_df, ["gain_cum_sum"], [2, 4, 6, 8, 10, 15, 20, 30])
             input_df = add_past_values(input_df, ["gain_cum_sum"], [2, 4, 6, 8, 10, 15, 20, 30])
-            input_df = input_df.drop(columns=["gain_cum_sum"])
             input_row = input_df.iloc[[-prediction_period]]
 
             # Model predictions
+            input_row = input_row[model.feature_names_in_]
             prediction = model.predict(input_row)[0]
             predictions.append(prediction)
             abs_errors.append(abs(prediction-y))
@@ -84,7 +98,6 @@ def train_model(prediction_period, path):
     train_df = pd.read_csv(path+f"\\train_trend_{prediction_period}_target.csv", index_col=False)
     validation_df = pd.read_csv(path+f"\\validation_trend_{prediction_period}_target.csv", index_col=False)
     test_df = pd.read_csv(path+f"\\test_trend_{prediction_period}_target.csv", index_col=False)
-
     train_df = train_df.sample(frac=1)
     validation_df = validation_df.sample(frac=1)
     test_df = test_df.sample(frac=1)
@@ -117,7 +130,7 @@ pd.set_option('display.max_columns', None)
 load_dotenv(find_dotenv())
 path = os.getenv('FOLDER_PATH')
 #model1 = train_model(1,path)
-model7 = train_model(7,path)
+model7 = train_model(1,path)
 
 
 
