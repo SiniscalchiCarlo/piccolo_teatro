@@ -1,20 +1,4 @@
-provare ad aggiungere feature da tenere
+config file per generare db, mettere un un file son con il config dentro la cartella con i csv
+input: periodo previsione, lista periodi medie mobili e offsett, dimensione train, validation e test
 
-
-possibili features: 
-    cos'è "D_SALES_LIST_SALES_T_AUDIENCE_SUB_CAT_ID"
-    CONSIDERARE DATI SU STESSI SPETTACOLI UGUALI FATTI ANNI PRECEDENTI
-    CONSIDERARE LA PERFORMANCE CHE NUMERO DI REPLICA è DI QUELL'ANNO, DARE DATI SU REPLICA ANALOGA ANNI SCORSI
-
-fare fillna con 0 per moving avarages?
-valutare diversi valori medie mobili
-dare valori puntuali diversi
-considero solo group >50
-dati pubblicità
-scraping dati teatro
-hyperparameter fine tuning
-"sentiment analysis"/embedding/... descrizione spettacolo
-
-
-nodi più influenti nel settore
-
+feture da aggiugnere, somma ultimi n giorni
