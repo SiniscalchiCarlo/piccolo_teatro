@@ -2,53 +2,12 @@ import pandas as pd
 from utils.logger import setup_logger
 import os
 from dotenv import load_dotenv, find_dotenv
-import matplotlib.pyplot as plt
-import time
-import math
+from utils.df_operations import one_hot_encode, add_cumulative_sum, add_moving_avarages, add_shifted_values, add_targets
+
 logger = setup_logger(__name__, level="INFO")
 
 
-def one_hot_encode(df, encoding_dict):
-    for col_name in encoding_dict:
-        values = encoding_dict[col_name]
-        for value in values:
-            if str(value)!="nan":
-                df[value.lower()] = (df[col_name] == value).astype(int)
-    group = group.drop(columns=list(encoding_dict.keys()))
-    return df
 
-def add_cumulative_sum(df, column_names: list[str]):
-    for col_name in column_names:
-        df[col_name+"_cum_sum"] = df[col_name].cumsum()
-    return df
-
-def add_moving_avarages(df, column_names: list[str], periods: list[int]):
-    for period in periods:
-        for col_name in column_names:
-            df[col_name+f"{period}d_avg"] = df[col_name].rolling(period).mean()
-            df = df.fillna(df[col_name].iloc[0])
-    return df
-
-def add_shifted_values(df, column_names: list[str], periods: list[int]):
-    for period in periods:
-        for col_name in column_names:
-            df[col_name+f"{period}d_ago"] = df[col_name].shift(period).fillna(df[col_name].iloc[0])
-            df = df.fillna(df[col_name].iloc[0])
-    return df
-
-def print_unique_values(df):
-    for col_name in df.columns:
-        print(f"{col_name}: {df[col_name].unique()[:10]}")
-
-def add_targets(df, targets_dict):
-    all_periods = []
-    for col_name in targets_dict:
-        periods = targets_dict[col_name]
-        all_periods += periods
-        for period in periods:
-            group[f"TARGET_{col_name}_{period}"] = group["gain_cum_sum"].shift(-period)
-    group = group.iloc[:-max(all_periods)]
-    return group
 
 def create_model_input(cleaned_sales, season_df, prediction_periods, train_dim = 0.6, validation_dim = 0.2):
     train_df = pd.DataFrame()
@@ -57,10 +16,9 @@ def create_model_input(cleaned_sales, season_df, prediction_periods, train_dim =
 
     performances_db = pd.read_csv(path+"\\D_CONFIG_PROD_LIST.csv", index_col=False)
     performances_db["D_CONFIG_PROD_LIST_T_PERFORMANCE_ID"] = performances_db["D_CONFIG_PROD_LIST_T_PERFORMANCE_ID"].astype(int)
-    encoding_dict = {
-            "performance_type": ['Internazionale', 'Ospitalità', 'Collaborazione', 'Produzione', 'Festival']
-        }
     
+
+
     groups = cleaned_sales.groupby('performance_id')
     
 
@@ -89,17 +47,22 @@ def create_model_input(cleaned_sales, season_df, prediction_periods, train_dim =
         
         
         # ADDING FEATURES:
-        # Distanza della transazione dall'inizio e dalla fine della stagione
-        group["start_season_distance"] = (group["date"]-start_date).dt.days.abs()
-        group["end_season_distance"] = (group["date"]-end_date).dt.days.abs()
-
+        
+        
         # Calcolo la cumulata del guadagno e del numero di biglietti venduti
         group = add_cumulative_sum(group, column_names=["gain", "tickets"])
+        group["avg_ticket_price"] = group["gain_cum_sum"]/group["tickets_cum_sum"]
         
         # Aggiungo i dati dei giorni mancanti (giorni senza vendite), li riempio mettendo l'ultimo valore noto
         date_range = pd.date_range(start=group["date"].min(), end=group["date"].max())
         group = group.set_index("date").reindex(date_range, method="ffill")
         group["date"] = group.index
+
+        # Distanza della transazione dall'inizio e dalla fine della stagione
+        group["start_sales_distance"] = (group["date"]-start_date).dt.days.abs()
+        group["end_season_distance"] = (group["date"]-end_date).dt.days.abs()
+        group["sales_duration"] = (group["date"].max()-start_date).days
+        group["end_sales_distance"] = (group["date"].max()-group["date"]).dt.days
         # Aggiungo medie mobili con differenti periodi
         group = add_moving_avarages(group, ["gain_cum_sum", "tickets_cum_sum"], [2,4,6,8,10,15,20,30])
         
@@ -107,16 +70,18 @@ def create_model_input(cleaned_sales, season_df, prediction_periods, train_dim =
         group = add_shifted_values(group, ["gain_cum_sum", "tickets_cum_sum"], [2,4,6,8,10,15,20,30])
         
         # Aggiungo i possibili target da prevedere:
-        group = add_targets(group, prediction_periods)
+        group = add_targets(group, targets_dict)
         
 
         # Add informations about the performance, is in another db
         group = add_performance_info(group,performances_db,performance_id)  
         
-            
-            
+        if not group.empty:
+            # Numero bigliettirimanenti per raggiungere capienza massima
+            group["remaining_tickets"] = group["performance_capacity"]-group["tickets_cum_sum"]
+
         if len(group)>30:
-            group.to_csv(path+f"\\performances\\{performance_id}_{prediction_period}_target.csv", date_format='%d/%m/%Y', index=False)
+            group.to_csv(path+f"\\performances\\{performance_id}_target.csv", date_format='%d/%m/%Y', index=False)
             
             if not tr:
                 train_df = pd.concat([train_df, group], ignore_index=True)
@@ -153,6 +118,7 @@ def convert_data(df):
     return df
 
 def get_sales(path: str):
+    print(path)
     sales_db = pd.read_csv(path+"\\D_SALES_LIST_SALES.csv", index_col=False)
 
     # Some columns have a space before the name, to remove it:
@@ -210,6 +176,32 @@ def add_performance_info(df, performances_db, performance_id):
     performance_type = performance_row["D_CONFIG_PROD_LIST_Tipologia_spettacolo"].iloc[0]
     performance_space = performance_row["D_CONFIG_PROD_LIST_SPACE"].iloc[0]
     performance_capacity = performance_row["D_CONFIG_PROD_LIST_PERFORMANCE_QUOTA"].iloc[0]
+    performance_date = performance_row["D_CONFIG_PROD_LIST_PRODUCT_DATE_TIME"].iloc[0]
+    preformance_season = performance_row["D_CONFIG_PROD_LIST_SEASON"].iloc[0]
+    performance_date = performance_date.split(" ")
+    show_id = performance_row["D_CONFIG_PROD_LIST_T_PRODUCT_ID"].iloc[0]
+
+    # Get all the performances of the same show
+    performances_same_show = performances_db[performances_db["D_CONFIG_PROD_LIST_T_PRODUCT_ID"]==show_id].copy()
+
+    def get_day_month(date, year1, year2):
+        date = date.split(" ")
+        day = int(date[1].split("/")[0])
+        month = int(date[1].split("/")[1])
+        if month<=12 and month>=9:
+            year = year1
+        else:   
+            year = year2
+        return f"{day}/{month}/{year}"
+    year1 = preformance_season.split(' ')[1].split('/')[0]
+    year2 = "20" + preformance_season.split(' ')[1].split('/')[1]
+    performances_same_show.loc[:, 'performance_date'] = performances_same_show['D_CONFIG_PROD_LIST_PRODUCT_DATE_TIME'].apply(lambda x: get_day_month(x, year1, year2))
+    performances_same_show["performance_date"] = pd.to_datetime(performances_same_show["performance_date"], format='%d/%m/%Y')
+    performances_same_show.sort_values(by='performance_date', inplace=True)
+    performances_same_show = performances_same_show.reset_index(drop=True)
+
+    performance_number = performances_same_show[performances_same_show["D_CONFIG_PROD_LIST_T_PERFORMANCE_ID"]==performance_id].index[0]
+
     performances_to_not_consider = [
         "Evento collaterale",
         "Altro",
@@ -223,13 +215,17 @@ def add_performance_info(df, performances_db, performance_id):
     if performance_state=="In esecuzione" and performance_type not in performances_to_not_consider and performance_space in spaces_to_consider:
         df["performance_type"] = performance_type
         df["performance_capacity"] = performance_capacity
+        df["performance_day"] = performance_date[0]
+        df["performance_hour"] = performance_date[2].split(":")[0]
+        df["num_performances"] = len(performances_same_show)
+        df["performance_number"] = performance_number
         df = one_hot_encode(df, encoding_dict)
         return df
     else:
         return pd.DataFrame()
 
 def prepare_data(path):
-    
+    print("path",path)
     # Remove transaction (rows) and columns I don't need
     sales_df = get_sales(path)
 
@@ -245,11 +241,20 @@ def prepare_data(path):
     seasons_df["fine_vendite"] = pd.to_datetime(seasons_df["fine_vendite"], format='%d/%m/%Y')
 
     # Create Model Input
-    train_df, validation_df, test_df = create_model_input(sales_df, seasons_df, prediction_period=1)
+    train_df, validation_df, test_df = create_model_input(sales_df, seasons_df, prediction_periods=[1,5])
 
 if __name__ == "__main__":
     
     load_dotenv(find_dotenv())
-    path = os.getenv('//home//carlo//Downloads//dati_piccolo_teatro')
-
+    path = os.environ.get("FOLDER_PATH")
+    encoding_dict = {
+            "performance_type": ['Internazionale', 'Ospitalità', 'Collaborazione', 'Produzione', 'Festival'],
+            "performance_day": ["lun", "mar", "mer", "gio", "ven", "sab", "dom"],
+        }
+    targets_dict = {
+        "gain_cum_sum":[1],
+        "tickets_cum_sum":[1],
+        "gain":[1],
+        "tickets":[1],
+    }
     prepare_data(path)

@@ -1,4 +1,17 @@
-config file per generare db, mettere un un file son con il config dentro la cartella con i csv
-input: periodo previsione, lista periodi medie mobili e offsett, dimensione train, validation e test
+METTERE CONTROLLI DI LOGICA:
+    - non posso calcolare ticket mancanti se ho target gain
+    - se ho come feature ticket rimantenti, devo avere anceh capacity
+    ...
 
-feture da aggiugnere, somma ultimi n giorni
+FEATURE DA AGGIUNGERE:
+    - METTERE DISTANZA DATA SPETTACOLO
+    - somma ultimi n giorni
+    - guadagno massimo (avg_price*capacity)
+    - guadagno mancante (avg_price*capacity-gain_cumm_sum)
+
+
+riscalare in base a punto finale,
+modello che indovina punto finale
+
+
+
