@@ -18,23 +18,19 @@ class TrainConfig:
     def __init__(self):
         self.periods: List[int] = [2, 4, 6, 8, 10, 15, 20, 30]
         self.prediction_period: int = 1
-        self.target: str = "tickets_cum_sum"
+        self.target: str = "percentage_bought"
 
         # Contanst features
         self.performance_type: DfColumns = DfColumns(columns=['internazionale', 'ospitalità', 'collaborazione', 'produzione', 'festival'],
                                                      const=True,
-                                                     enabled=True)
+                                                     enabled=False)
         self.performance_day: DfColumns = DfColumns(columns=["lun", "mar", "mer", "gio", "ven", "sab", "dom"],
                                                     const=True,
-                                                    enabled=True)
-
-        self.performance_capacity: DfColumns = DfColumns(columns=["performance_capacity"],
-                                                         const=True,
-                                                         enabled=True)
+                                                    enabled=False)
         
         self.performance_capacity: DfColumns = DfColumns(columns=["performance_capacity"],
                                                          const=True,
-                                                         enabled=True)
+                                                         enabled=False)
         
         self.performance_hour: DfColumns = DfColumns(columns=["performance_hour"],
                                                          const=True,
@@ -70,11 +66,11 @@ class TrainConfig:
         #                                             enabled=False)
         self.remaining_tickets: DfColumns = DfColumns(columns=["remaining_tickets"],
                                                       const=False,
-                                                      enabled=True)
+                                                      enabled=False)
         
         self.tickets_cum_sum: DfColumns = DfColumns(columns=["tickets_cum_sum"],
                                                     const=False,
-                                                    enabled=True)
+                                                    enabled=False)
         
         #self.gain_cum_sum: DfColumns = DfColumns(columns=["gain_cum_sum"],
         #                                        const=False,
@@ -83,6 +79,10 @@ class TrainConfig:
         self.tickets: DfColumns = DfColumns(columns=["tickets"],
                                                 const=False,
                                                 enabled=False)
+        
+        self.percentage_bought = DfColumns(columns=["percentage_bought"],
+                                                const=False,
+                                                enabled=True)
         
         #self.gain: DfColumns = DfColumns(columns=["gain"],
         #                                        const=False,
@@ -95,20 +95,28 @@ class TrainConfig:
         #self.gain_avg(enabled=False)
         #self.gain_shifted(enabled=False)
 
-        self.get_tickets_cum_sum_avg(enabled=True),
-        self.get_tickets_cum_sum_shifted(enabled=True)
+        self.get_tickets_cum_sum_avg(enabled=False),
+        self.get_tickets_cum_sum_shifted(enabled=False)
 
         self.get_tickets_avg(enabled=False),
         self.get_tickets_shifted(enabled=False)
 
+
+        self.get_percentage_bought_avg(enabled=True),
+        self.get_percentage_bought_shifted(enabled=True)
+
         self.features: List[DfColumns] = [self.performance_type, self.performance_day,
                                           self.performance_capacity, 
-                                          self.start_sales_distance, self.end_sales_distance,
-                                          self.end_season_distance,
+                                          self.start_sales_distance, self.end_sales_distance,self.end_season_distance,
                                           #self.avg_ticket_price,
-                                          self.remaining_tickets, self.tickets_cum_sum,
-                                          #self.gain_cum_sum_avg, self.gain_cum_sum_shifted ,
-                                          self.tickets_cum_sum_avg, self.tickets_cum_sum_shifted]
+                                          #self.gain_cum_sum_avg, self.gain_cum_sum_shifted,
+                                          self.remaining_tickets, 
+
+                                          self.tickets, self.tickets_cum_sum, 
+                                          self.tickets_cum_sum_avg, self.tickets_cum_sum_shifted,
+
+                                          self.percentage_bought, self.percentage_bought_avg, self.percentage_bought_shifted
+                                          ]
 
             
     def create_period_names(self, col_name: str) -> List[str]:
@@ -136,6 +144,19 @@ class TrainConfig:
     def get_tickets_shifted(self, enabled) -> List[str]:
         columns = self.create_period_names("tickets_shifted")
         self.tickets_shifted = DfColumns(columns=columns,
+                                    const=False,
+                                    enabled=enabled)
+    
+    
+    def get_percentage_bought_avg(self, enabled) -> List[str]:
+        columns = self.create_period_names("percentage_bought_avg")
+        self.percentage_bought_avg = DfColumns(columns=columns,
+                                    const=False,
+                                    enabled=enabled)
+        
+    def get_percentage_bought_shifted(self, enabled) -> List[str]:
+        columns = self.create_period_names("percentage_bought_shifted")
+        self.percentage_bought_shifted = DfColumns(columns=columns,
                                     const=False,
                                     enabled=enabled)
         

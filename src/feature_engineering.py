@@ -3,7 +3,7 @@ from utils.logger import setup_logger
 import os
 from dotenv import load_dotenv, find_dotenv
 from utils.df_operations import one_hot_encode, add_cumulative_sum, add_moving_avarages, add_shifted_values, add_targets
-
+from datetime import datetime
 logger = setup_logger(__name__, level="INFO")
 
 
@@ -28,6 +28,7 @@ def create_model_input(cleaned_sales, season_df, prediction_periods, train_dim =
     tr=False
     val=False
     for performance_id, group in groups:
+        #print(group)
         i+=1
         counter+=1
         print(i/len_)
@@ -53,33 +54,38 @@ def create_model_input(cleaned_sales, season_df, prediction_periods, train_dim =
         group = add_cumulative_sum(group, column_names=["gain", "tickets"])
         group["avg_ticket_price"] = group["gain_cum_sum"]/group["tickets_cum_sum"]
         
-        # Aggiungo i dati dei giorni mancanti (giorni senza vendite), li riempio mettendo l'ultimo valore noto
-        date_range = pd.date_range(start=group["date"].min(), end=group["date"].max())
-        group = group.set_index("date").reindex(date_range, method="ffill")
-        group["date"] = group.index
-
-        # Distanza della transazione dall'inizio e dalla fine della stagione
-        group["start_sales_distance"] = (group["date"]-start_date).dt.days.abs()
-        group["end_season_distance"] = (group["date"]-end_date).dt.days.abs()
-        group["sales_duration"] = (group["date"].max()-start_date).days
-        group["end_sales_distance"] = (group["date"].max()-group["date"]).dt.days
-        # Aggiungo medie mobili con differenti periodi
-        group = add_moving_avarages(group, ["gain_cum_sum", "tickets_cum_sum"], [2,4,6,8,10,15,20,30])
-        
-        # Aggiungo valori shiftati
-        group = add_shifted_values(group, ["gain_cum_sum", "tickets_cum_sum"], [2,4,6,8,10,15,20,30])
-        
-        # Aggiungo i possibili target da prevedere:
-        group = add_targets(group, targets_dict)
-        
-
         # Add informations about the performance, is in another db
         group = add_performance_info(group,performances_db,performance_id)  
-        
+
         if not group.empty:
+            performance_date = group["performance_date"].iloc[0]
+            # Aggiungo i dati dei giorni mancanti (giorni senza vendite), li riempio mettendo l'ultimo valore noto
+            date_range = pd.date_range(start=group["date"].min(), end=performance_date)
+            group = group.set_index("date").reindex(date_range, method="ffill")
+            group["date"] = group.index
+
+        
+            # Distanza della transazione dall'inizio e dalla fine della stagione
+            group["start_sales_distance"] = (group["date"]-start_date).dt.days.abs()
+            group["end_season_distance"] = (group["date"]-end_date).dt.days.abs()
+            group["sales_duration"] = (group["date"].max()-start_date).days
+            group["end_sales_distance"] = (group["date"].max()-group["date"]).dt.days
+
+        
+        
             # Numero bigliettirimanenti per raggiungere capienza massima
             group["remaining_tickets"] = group["performance_capacity"]-group["tickets_cum_sum"]
+            group["percentage_bought"] = group["tickets_cum_sum"]/group["performance_capacity"]
 
+            # Aggiungo medie mobili con differenti periodi
+            group = add_moving_avarages(group, ["gain_cum_sum", "tickets_cum_sum", "percentage_bought"], [2,4,6,8,10,15,20,30])
+            
+            # Aggiungo valori shiftati
+            group = add_shifted_values(group, ["gain_cum_sum", "tickets_cum_sum", "percentage_bought"], [2,4,6,8,10,15,20,30])
+
+            # Aggiungo i possibili target da prevedere:
+            group = add_targets(group, targets_dict)
+        
         if len(group)>30:
             group.to_csv(path+f"\\performances\\{performance_id}_target.csv", date_format='%d/%m/%Y', index=False)
             
@@ -153,7 +159,7 @@ def get_sales(path: str):
         "SINGLE_ENTRY",
     ]
     # remoniving covid seasons
-    sales_db = sales_db[~sales_db['season_id'].isin(
+    sales_db = sales_db[~sales_db['D_SALES_LIST_SALES_SEASON'].isin(
         seasons_to_remove)]
 
     # removing sales of products that are not shows
@@ -176,9 +182,8 @@ def add_performance_info(df, performances_db, performance_id):
     performance_type = performance_row["D_CONFIG_PROD_LIST_Tipologia_spettacolo"].iloc[0]
     performance_space = performance_row["D_CONFIG_PROD_LIST_SPACE"].iloc[0]
     performance_capacity = performance_row["D_CONFIG_PROD_LIST_PERFORMANCE_QUOTA"].iloc[0]
-    performance_date = performance_row["D_CONFIG_PROD_LIST_PRODUCT_DATE_TIME"].iloc[0]
+    performance_date_info = performance_row["D_CONFIG_PROD_LIST_PRODUCT_DATE_TIME"].iloc[0]
     preformance_season = performance_row["D_CONFIG_PROD_LIST_SEASON"].iloc[0]
-    performance_date = performance_date.split(" ")
     show_id = performance_row["D_CONFIG_PROD_LIST_T_PRODUCT_ID"].iloc[0]
 
     # Get all the performances of the same show
@@ -192,9 +197,14 @@ def add_performance_info(df, performances_db, performance_id):
             year = year1
         else:   
             year = year2
+            
         return f"{day}/{month}/{year}"
+    
+
     year1 = preformance_season.split(' ')[1].split('/')[0]
     year2 = "20" + preformance_season.split(' ')[1].split('/')[1]
+    performance_date = get_day_month(performance_date_info, year1, year2)
+    performance_date = datetime.strptime(performance_date, "%d/%m/%Y")
     performances_same_show.loc[:, 'performance_date'] = performances_same_show['D_CONFIG_PROD_LIST_PRODUCT_DATE_TIME'].apply(lambda x: get_day_month(x, year1, year2))
     performances_same_show["performance_date"] = pd.to_datetime(performances_same_show["performance_date"], format='%d/%m/%Y')
     performances_same_show.sort_values(by='performance_date', inplace=True)
@@ -215,10 +225,11 @@ def add_performance_info(df, performances_db, performance_id):
     if performance_state=="In esecuzione" and performance_type not in performances_to_not_consider and performance_space in spaces_to_consider:
         df["performance_type"] = performance_type
         df["performance_capacity"] = performance_capacity
-        df["performance_day"] = performance_date[0]
-        df["performance_hour"] = performance_date[2].split(":")[0]
+        df["performance_day"] = performance_date_info[0]
+        df["performance_hour"] = performance_date_info[2].split(":")[0]
         df["num_performances"] = len(performances_same_show)
         df["performance_number"] = performance_number
+        df["performance_date"] = performance_date
         df = one_hot_encode(df, encoding_dict)
         return df
     else:
@@ -247,14 +258,17 @@ if __name__ == "__main__":
     
     load_dotenv(find_dotenv())
     path = os.environ.get("FOLDER_PATH")
+    
     encoding_dict = {
             "performance_type": ['Internazionale', 'Ospitalità', 'Collaborazione', 'Produzione', 'Festival'],
             "performance_day": ["lun", "mar", "mer", "gio", "ven", "sab", "dom"],
         }
+    
     targets_dict = {
-        "gain_cum_sum":[1],
-        "tickets_cum_sum":[1],
-        "gain":[1],
-        "tickets":[1],
+        "gain_cum_sum": [1],
+        "tickets_cum_sum": [1],
+        "gain": [1],
+        "tickets": [1],
+        "percentage_bought": [1]
     }
     prepare_data(path)
