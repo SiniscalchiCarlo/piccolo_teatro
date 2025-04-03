@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 from utils.df_operations import add_cumulative_sum, add_moving_avarages, add_shifted_values, print_unique_values 
 from config.train_config import TrainConfig
 
-def trend_error(df, model, start_offset, train_config, plot=True):
+def trend_error(df, model, start_offset, train_config, scale=False, plot=True):
 
     prediction_period = train_config.prediction_period
     target_type = train_config.target
@@ -22,7 +22,11 @@ def trend_error(df, model, start_offset, train_config, plot=True):
 
     performances = df['performance_id'].unique()
     abs_errors = []
+    i = 0
+    len_performances = len(performances)
     for performance_id in performances:
+        i+=1
+        print(i/len_performances)
         performance_id = random.choice(performances)
         df_ = df.copy()
         df_ = df_[df_["performance_id"] == performance_id]
@@ -32,7 +36,7 @@ def trend_error(df, model, start_offset, train_config, plot=True):
         
         
 
-        start_offset = int(len(X_test)*0.3)
+        start_offset = int(len(X_test)*0.2)
 
         last_known_date = X_test.index[start_offset-1] #se voglio la start_offset riga es = 10 voglio la rica di indice start_offset-1=9 perché inizio a contare da 0
         end_date = X_test.index[-1]
@@ -62,11 +66,11 @@ def trend_error(df, model, start_offset, train_config, plot=True):
                     input_df[col] = first_row[col]
 
         # So the first prediction will made for the start_day+1day
-        print(last_known_date, last_known_date + pd.Timedelta(days=1))
+        #print(last_known_date, last_known_date + pd.Timedelta(days=1))
         target_df = Y_test.loc[last_known_date + pd.Timedelta(days=1):end_date]
         predictions = []
         plt.plot(target_df, color="blue")
-        print("INPUT ROWS:")
+        #print("INPUT ROWS:")
         for index, y in target_df.items():
 
             # MODEL PREDICTION
@@ -123,9 +127,20 @@ def trend_error(df, model, start_offset, train_config, plot=True):
             #time.sleep(1000)
 
         if plot:
+            if scale:
+                start = predictions[0]
+                end = predictions[-1]
+                new_end = target_df[-1]
+                scale_factor = (new_end - start) / (end - start)
+
+                # Apply the transformation (scaling relative to point A)
+                scaled_predictions = [start + scale_factor * (p - start) for p in predictions] 
+
+
+
             plt.plot(target_df.index, predictions, color="red")
-        #print(input_df)
-        plt.show()
+            plt.plot(target_df.index, scaled_predictions, color="green")
+            plt.show()
     print("AVG_ERROR", sum(abs_errors)/len(abs_errors))
 
 
@@ -190,4 +205,4 @@ print(f"Training Mean Absolute Error: {train_mae}")
 print(f"Validation Mean Absolute Error: {validation_mae}")
 
 trend_error(df=validation_df, model=model,
-            start_offset=30, train_config=train_config)
+            start_offset=30, train_config=train_config, scale=True, plot=True)
