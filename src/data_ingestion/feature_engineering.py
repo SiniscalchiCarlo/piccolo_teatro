@@ -1,8 +1,9 @@
 import pandas as pd
+from config import FeatEngConf
 from utils.logger import setup_logger
 import os
 from dotenv import load_dotenv, find_dotenv
-from utils.df_operations import one_hot_encode, add_cumulative_sum, add_moving_avarages, add_shifted_values, add_targets
+from utils import one_hot_encode, add_cumulative_sum, add_moving_avarages, add_shifted_values, add_targets
 from datetime import datetime
 logger = setup_logger(__name__, level="INFO")
 
@@ -258,17 +259,7 @@ if __name__ == "__main__":
     
     load_dotenv(find_dotenv())
     path = os.environ.get("FOLDER_PATH")
-    
-    encoding_dict = {
-            "performance_type": ['Internazionale', 'Ospitalità', 'Collaborazione', 'Produzione', 'Festival'],
-            "performance_day": ["lun", "mar", "mer", "gio", "ven", "sab", "dom"],
-        }
-    
-    targets_dict = {
-        "gain_cum_sum": [1],
-        "tickets_cum_sum": [1],
-        "gain": [1],
-        "tickets": [1],
-        "percentage_bought": [1]
-    }
+    feat_eng_conf = FeatEngConf()
+    encoding_dict = feat_eng_conf.encoding_dict
+    targets_dict = feat_eng_conf.targets_dict
     prepare_data(path)

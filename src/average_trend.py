@@ -9,8 +9,8 @@ from sklearn.metrics import mean_absolute_error
 from dotenv import load_dotenv, find_dotenv
 import matplotlib.pyplot as plt
 
-from utils.df_operations import add_cumulative_sum, add_moving_avarages, add_shifted_values, print_unique_values 
-from config.train_config import TrainConfig
+from utils import add_cumulative_sum, add_moving_avarages, add_shifted_values, print_unique_values 
+from config import TrainConfig
 
 def get_longest_duration(df):
 
