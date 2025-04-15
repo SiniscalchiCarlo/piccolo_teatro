@@ -22,7 +22,7 @@ class ModelData(BaseModel):
         arbitrary_types_allowed = True
 
     def load_df(self):
-        self.df = pd.read_csv(self.df_path, index_col=False)
+        self.df = pd.read_parquet(self.df_path)
         
         #if offset is not None:
         #    self.df =self.df.head(int(len(self.df)*offset))

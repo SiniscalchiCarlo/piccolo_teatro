@@ -11,7 +11,7 @@ class TrainConfig(BaseModel):
 class FeatEngConf(BaseModel):
     encoding_dict: Dict[str, List[str]] = {
         "performance_type": ['Internazionale', 'Ospitalità', 'Collaborazione', 'Produzione', 'Festival'],
-        "performance_day": ["lun", "mar", "mer", "gio", "ven", "sab", "dom"],
+    #    "performance_day": ["lun", "mar", "mer", "gio", "ven", "sab", "dom"],
     }
 
     targets_dict: Dict[str, List[int]] = {
@@ -41,30 +41,30 @@ class Features:
                                                         enabled=False,
                                                         update=self.__update_const)
         
-        self.performance_day: Feature = Feature(columns=self.feat_eng_conf.encoding_dict["performance_day"],
-                                                    const=True,
-                                                    enabled=False,
-                                                    update=self.__update_const)
+        #self.performance_day: Feature = Feature(columns=self.feat_eng_conf.encoding_dict["performance_day"],
+        #                                            const=True,
+        #                                            enabled=False,
+        #                                            update=self.__update_const)
         
         self.performance_capacity: Feature = Feature(columns=["performance_capacity"],
                                                             const=True,
                                                             enabled=False,
                                                             update=self.__update_const)
         
-        self.performance_hour: Feature = Feature(columns=["performance_hour"],
-                                                            const=True,
-                                                            enabled=False,
-                                                            update=self.__update_const)
+        #self.performance_hour: Feature = Feature(columns=["performance_hour"],
+        #                                                    const=True,
+        #                                                    enabled=False,
+        #                                                    update=self.__update_const)
         
         self.num_performances: Feature = Feature(columns=["num_performances"],
                                                             const=True,
                                                             enabled=False,
                                                             update=self.__update_const)
         
-        self.performance_number: Feature = Feature(columns=["performance_number"],
-                                                            const=True,
-                                                            enabled=False,
-                                                            update=self.__update_const)
+        #self.performance_number: Feature = Feature(columns=["performance_number"],
+        #                                                    const=True,
+        #                                                    enabled=False,
+        #                                                    update=self.__update_const)
         
         self.sales_duration: Feature = Feature(columns=["sales_duration"],
                                                             const=True,

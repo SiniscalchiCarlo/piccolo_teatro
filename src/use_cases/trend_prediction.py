@@ -24,7 +24,7 @@ class TrendPrediction(BaseModel):
     def load_model(self):
         self.model = pickle.load(open(self.model_path, "rb"))
 
-    def trend_prediction(self, performance_date: datetime, plot: bool, offset: float=None):
+    def trend_prediction(self, last_date: datetime, plot: bool, offset: float=None):
 
         #get only the part of known data to do the simulation
         
@@ -37,7 +37,7 @@ class TrendPrediction(BaseModel):
             start_day = self.data.df.head(day_offset)["date"].iloc[-1]
 
         predictions_range = pd.date_range(start=pd.to_datetime(start_day, format="%d/%m/%Y"),
-                           end=pd.to_datetime(performance_date, format="%d/%m/%Y"))
+                           end=pd.to_datetime(last_date, format="%d/%m/%Y"))
         num_predictions = len(predictions_range)
 
         if self.data.X is None and self.data.Y is None:

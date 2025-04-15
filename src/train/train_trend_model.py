@@ -11,8 +11,8 @@ pd.set_option('display.max_columns', None)
 load_dotenv(find_dotenv())
 path = os.getenv('FOLDER_PATH')
 
-train_path = path+f"\\train_trend.csv"
-validation_path = path+f"\\validation_trend.csv"
+train_path = path+f"\\train_trend.gzip"
+validation_path = path+f"\\validation_trend.gzip"
 
 train_config = TrainConfig()
 features_config = Features()
