@@ -75,17 +75,20 @@ class Features:
         # Variables features
         self.start_sales_distance: Feature = Feature(columns=["start_sales_distance"],
                                                             const=False,
-                                                            enabled=True,
+                                                            enabled=False,
                                                             update=self.__update_start_sales_distance)
         
         self.end_sales_distance: Feature = Feature(columns=["end_sales_distance"],
                                                             const=False,
-                                                            enabled=True,
+                                                            enabled=False,
                                                             update=self.__update_end_sales_distance)
         
         self.end_season_distance: Feature = Feature(columns=["end_season_distance"],
                                                             const=False,
                                                             enabled=False)
+        self.percentage_sales_day: Feature = Feature(columns=["percentage_sales_day"],
+                                                     cont=False,
+                                                     enabled=True)
     
         self.remaining_tickets: Feature = Feature(columns=["remaining_tickets"],
                                                         const=False,

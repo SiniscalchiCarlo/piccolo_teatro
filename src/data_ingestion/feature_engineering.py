@@ -72,6 +72,7 @@ class FeatureEngineering:
                 group["end_season_distance"] = (group["date"]-end_date).dt.days.abs()
                 group["sales_duration"] = (group["date"].max()-start_date).days
                 group["end_sales_distance"] = (group["date"].max()-group["date"]).dt.days
+                group["percentage_sales_day"] = group["start_sales_distance"]/(group["date"].max()-start_date).days
 
             
             
