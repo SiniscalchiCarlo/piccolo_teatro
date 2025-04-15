@@ -89,7 +89,7 @@ class FeatureEngineering:
                 group = add_targets(group, self.targets_dict)
             
             if len(group)>30:
-                group.to_parquet(self.path+f"\\performances\\{show_id}_target.gzip", index=False)
+                group.to_parquet(self.path+f"\\shows\\{show_id}.gzip", index=False)
                 
                 if not tr:
                     self.TRAIN = pd.concat([self.TRAIN, group], ignore_index=True)

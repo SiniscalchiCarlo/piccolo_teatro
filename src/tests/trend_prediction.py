@@ -22,9 +22,9 @@ len_performances = len(performances)
 for show_id in performances:
     i+=1
     print(show_id, i/len_performances)
-    df = pd.read_parquet(path+f"\\performances\\{show_id}_target.gzip")
+    df = pd.read_parquet(path+f"\\shows\\{show_id}_target.gzip")
     
-    performance_data = ModelData(df_path=path+f"\\performances\\{show_id}_target.gzip")
+    performance_data = ModelData(df_path=path+f"\\shows\\{show_id}.gzip")
     performance_data.load_df()
     performance_prediction = TrendPrediction(model_path=path+f"\\models\\XGB_trend.pkl", data=performance_data)
     end_date = performance_data.df["last_date"].iloc[0]
