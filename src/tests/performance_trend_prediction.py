@@ -1,4 +1,5 @@
 import os
+from tkinter import N
 
 from dotenv import find_dotenv, load_dotenv
 import pandas as pd
@@ -22,11 +23,12 @@ len_performances = len(performances)
 for performance_id in performances:
     i+=1
     print(performance_id, i/len_performances)
-    df = pd.read_csv(path+f"\\performances\\{performance_id}_target.csv")
+    df = pd.read_csv(path+f"\\performances\\{performance_id}.csv")
     
-    performance_data = ModelData(df_path=path+f"\\performances\\{performance_id}_target.csv")
+    performance_data = ModelData(df_path=path+f"\\performances\\{performance_id}.csv")
     performance_data.load_df()
     performance_prediction = TrendPrediction(model_path=path+f"\\models\\XGB_trend.pkl", data=performance_data)
     end_date = performance_data.df["performance_date"].iloc[0]
     print(type(end_date), end_date)
     performance_prediction.trend_prediction(performance_date=end_date, plot=True, offset=0.4)
+

@@ -48,12 +48,15 @@ class TrendPrediction(BaseModel):
             self.data.X = self.data.X.head(day_offset)
 
         predictions = []
+        deltas = []
         for i in range(num_predictions):
             #1. MODEL PREDICTION
             input_row = self.data.X.iloc[[-1]] # Take the last known row of known data/data generated from predictions
             input_row = input_row[self.model.feature_names_in_]  # Ordering features in the order the model was trained
             prediction = self.model.predict(input_row)[0]
+            deltas.append(prediction-predictions[-1] if len(predictions)!=0 else prediction)
             predictions.append(prediction)
+            
 
             #2. UPDATING FEATURES
             self.features_config.update_features(self.data.X, prediction)
@@ -63,3 +66,8 @@ class TrendPrediction(BaseModel):
             plt.plot(self.data.Y)
             plt.plot(predictions_range, predictions, color="red")
             plt.show()
+        output = pd.DataFrame()
+        output["percentage_bought"] = predictions
+        output["date"] = predictions_range
+        output["delta"] = deltas
+        return output

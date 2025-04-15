@@ -1,11 +1,9 @@
 import pandas as pd
 from config import FeatEngConf
-from utils.logger import setup_logger
 import os
 from dotenv import load_dotenv, find_dotenv
 from utils import one_hot_encode, add_cumulative_sum, add_moving_avarages, add_shifted_values, add_targets
 from datetime import datetime
-logger = setup_logger(__name__, level="INFO")
 
 
 
@@ -45,8 +43,7 @@ def create_model_input(cleaned_sales, season_df, prediction_periods, train_dim =
         group = group.drop(columns=["individuali_gruppi","online_offline"])
 
         # Sommo giorno i dati delle vendite
-        group = group.groupby(['date', 'season_id', 'performance_id'], as_index=False).sum()
-        
+        group = group.groupby(['date', 'season_id', 'performance_id', 'show_id'], as_index=False).sum()
         
         # ADDING FEATURES:
         
@@ -88,7 +85,7 @@ def create_model_input(cleaned_sales, season_df, prediction_periods, train_dim =
             group = add_targets(group, targets_dict)
         
         if len(group)>30:
-            group.to_csv(path+f"\\performances\\{performance_id}_target.csv", date_format='%d/%m/%Y', index=False)
+            group.to_csv(path+f"\\performances\\{performance_id}.csv", date_format='%d/%m/%Y', index=False)
             
             if not tr:
                 train_df = pd.concat([train_df, group], ignore_index=True)
@@ -138,6 +135,7 @@ def get_sales(path: str):
         "D_SALES_LIST_SALES_CURRENT_QUANTITY": "tickets",
         "D_SALES_LIST_SALES_REFERENCE_DATE": "date",
         "D_SALES_LIST_SALES_T_SEASON_ID": "season_id",
+        "D_SALES_LIST_SALES_T_PRODUCT_ID": "show_id",
         "D_SALES_LIST_SALES_T_PERFORMANCE_ID": "performance_id",
     })
 
@@ -147,6 +145,7 @@ def get_sales(path: str):
                             "tickets",
                             "date",
                             "season_id",
+                            "show_id",
                             "performance_id",
                             ]
     
