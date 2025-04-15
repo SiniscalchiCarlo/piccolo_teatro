@@ -22,8 +22,10 @@ test_data.load_df()
 shows_ids = test_data.df['show_id'].unique()
 len_shows = len(shows_ids)
 for show_id in shows_ids:
+    show_id = 10228587005392
     performances_same_show = PERFORMANCES[PERFORMANCES["D_CONFIG_PROD_LIST_T_PRODUCT_ID"]==show_id]
     n_performances = len(performances_same_show)
+    print("N performances", n_performances)
     performances_predictions = []
     for performance_id in performances_same_show["D_CONFIG_PROD_LIST_T_PERFORMANCE_ID"]:
         df = pd.read_csv(path+f"\\performances\\{performance_id}.csv")
@@ -39,5 +41,8 @@ for show_id in shows_ids:
     all_predictions = all_predictions.groupby(['date']).sum()
     all_predictions = add_cumulative_sum(all_predictions, ["delta"])
     print(all_predictions)
-    plt.plot(all_predictions["delta_cum_sum"])
+
+    real_show_trend = pd.read_parquet(path+f"\\shows\\{show_id}.gzip")
+    plt.plot(real_show_trend["date"], real_show_trend["percentage_bought"], color="blue")
+    plt.plot(all_predictions["delta_cum_sum"], color="orange")
     plt.show()
