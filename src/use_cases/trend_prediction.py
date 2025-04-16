@@ -52,6 +52,7 @@ class TrendPrediction(BaseModel):
             #1. MODEL PREDICTION
             input_row = self.data.X.iloc[[-1]] # Take the last known row of known data/data generated from predictions
             input_row = input_row[self.model.feature_names_in_]  # Ordering features in the order the model was trained
+            print(input_row.iloc[0])
             prediction = self.model.predict(input_row)[0]
             predictions.append(prediction)
 

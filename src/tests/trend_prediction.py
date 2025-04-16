@@ -7,9 +7,7 @@ import matplotlib.pyplot as plt
 from train.model_preparation import ModelData
 from use_cases.trend_prediction import TrendPrediction
 
-
-
-
+pd.set_option("display.max_columns", None)
 load_dotenv(find_dotenv())
 path = os.getenv('FOLDER_PATH')
 test_path = path+f"\\test_trend.gzip"
@@ -20,6 +18,7 @@ performances = test_data.df['show_id'].unique()
 i = 0
 len_performances = len(performances)
 for show_id in performances:
+    show_id = 10228587005392
     i+=1
     print(show_id, i/len_performances)
     df = pd.read_parquet(path+f"\\shows\\{show_id}_target.gzip")

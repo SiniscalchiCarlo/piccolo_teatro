@@ -68,14 +68,14 @@ class Features:
         
         self.sales_duration: Feature = Feature(columns=["sales_duration"],
                                                             const=True,
-                                                            enabled=False,
+                                                            enabled=True,
                                                             update=self.__update_const)
         
 
         # Variables features
         self.start_sales_distance: Feature = Feature(columns=["start_sales_distance"],
                                                             const=False,
-                                                            enabled=False,
+                                                            enabled=True,
                                                             update=self.__update_start_sales_distance)
         
         self.end_sales_distance: Feature = Feature(columns=["end_sales_distance"],
@@ -87,8 +87,9 @@ class Features:
                                                             const=False,
                                                             enabled=False)
         self.percentage_sales_day: Feature = Feature(columns=["percentage_sales_day"],
-                                                     cont=False,
-                                                     enabled=True)
+                                                     const=False,
+                                                     enabled=True,
+                                                     update=self.__update_percentage_sales_day)
     
         self.remaining_tickets: Feature = Feature(columns=["remaining_tickets"],
                                                         const=False,
@@ -165,6 +166,11 @@ class Features:
                                     enabled=enabled,
                                     update=self.__update_percentage_bought_shifted)
 
+
+    def __update_const(self, col_name):
+        const_val = self.input_df[col_name].iloc[-1]
+        self.updated_df[col_name] = const_val
+
     def __update_percentage_bought(self):
         targets_and_predictions = self.input_df["percentage_bought"].tolist() + [self.prediction]
         self.updated_df["percentage_bought"] = targets_and_predictions
@@ -188,8 +194,11 @@ class Features:
         values = self.input_df["end_sales_distance"].tolist()
         values.append(new_value)
         self.updated_df["end_sales_distance"] = values
-
-    def __update_const(self, col_name):
-        const_val = self.input_df[col_name].iloc[-1]
-        self.updated_df["end_sales_distance"] = const_val
+    
+    def __update_percentage_sales_day(self):
+        last_row = self.input_df.iloc[[-1]]
+        increased_day = float(last_row["start_sales_distance"].iloc[0]) + 1
+        values = self.input_df["percentage_sales_day"].tolist()
+        values.append(increased_day/self.input_df["sales_duration"].iloc[0])
+        self.updated_df["percentage_sales_day"] = values
         
