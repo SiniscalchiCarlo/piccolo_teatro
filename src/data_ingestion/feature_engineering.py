@@ -68,6 +68,7 @@ def create_model_input(cleaned_sales, season_df, prediction_periods, train_dim =
             group["end_season_distance"] = (group["date"]-end_date).dt.days.abs()
             group["sales_duration"] = (group["date"].max()-start_date).days
             group["end_sales_distance"] = (group["date"].max()-group["date"]).dt.days
+            group["percentage_sales_day"] = group["start_sales_distance"]/(group["date"].max()-start_date).days
 
         
         
@@ -262,3 +263,7 @@ if __name__ == "__main__":
     encoding_dict = feat_eng_conf.encoding_dict
     targets_dict = feat_eng_conf.targets_dict
     prepare_data(path)
+
+
+#git stash push
+#git stash pop
