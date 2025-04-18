@@ -11,16 +11,16 @@ pd.set_option('display.max_columns', None)
 load_dotenv(find_dotenv())
 path = os.getenv('FOLDER_PATH')
 
-train_path = path+f"\\train_trend.gzip"
-validation_path = path+f"\\validation_trend.gzip"
+train_df = pd.read_parquet(path+f"\\train_trend.gzip")
+validation_df = pd.read_parquet(path+f"\\validation_trend.gzip")
 
 train_config = TrainConfig()
 features_config = Features()
 
-train_data = ModelData(df_path=train_path)
-validation_data = ModelData(df_path=validation_path)
-train_data.load_df()
-validation_data.load_df()
+train_data = ModelData(df=train_df)
+validation_data = ModelData(df=validation_df)
+
+
 train_data.separete_features_targets(sort=False, shuffle=True)
 validation_data.separete_features_targets(sort=False, shuffle=True)
 
@@ -32,4 +32,5 @@ train_xgb.train_XGBRegressor({
 })
 train_xgb.abs_error("train")
 train_xgb.abs_error("validation")
-train_xgb.save_model(path+f"\\models\\XGB_trend.pkl")
+model_path = os.path.join(os.path.dirname(__file__), "..", "models", "XGB_trend.pkl")
+train_xgb.save_model(model_path)

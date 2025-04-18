@@ -11,7 +11,7 @@ from config import TrainConfig
 from train.model_preparation import Features, ModelData
 
 class TrendPrediction(BaseModel):
-    model_path: str
+    model: str
     data: ModelData
     train_config: TrainConfig = TrainConfig()
     features_config: Features = Features()
@@ -20,16 +20,8 @@ class TrendPrediction(BaseModel):
     class Config:
         arbitrary_types_allowed = True
 
-    
-    def load_model(self):
-        self.model = pickle.load(open(self.model_path, "rb"))
 
     def trend_prediction(self, last_date: datetime, plot: bool, offset: float=None):
-
-        #get only the part of known data to do the simulation
-        
-        if self.model is None:
-            self.load_model()
         
         # Calculating the predictions span
         if offset is not None:
@@ -64,3 +56,5 @@ class TrendPrediction(BaseModel):
             plt.plot(self.data.Y)
             plt.plot(predictions_range, predictions, color="red")
             plt.show()
+
+        return predictions

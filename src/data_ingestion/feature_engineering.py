@@ -6,7 +6,7 @@ from utils import one_hot_encode, add_cumulative_sum, add_moving_avarages, add_s
 from datetime import datetime
 
 class FeatureEngineering:
-    def __init__(self):
+    def __init__(self, SALES: pd.DataFrame, PERFORMANCES: pd.DataFrame, SEASONS: pd.DataFrame):
         load_dotenv(find_dotenv())
         self.path = os.environ.get("FOLDER_PATH")
 
@@ -14,9 +14,9 @@ class FeatureEngineering:
         self.encoding_dict = self.feat_eng_conf.encoding_dict
         self.targets_dict = self.feat_eng_conf.targets_dict
 
-        self.SALES = pd.read_csv(self.path+"\\D_SALES_LIST_SALES.csv", index_col=False)
-        self.PERFORMANCES = pd.read_csv(self.path+"\\D_CONFIG_PROD_LIST.csv", index_col=False)
-        self.SEASONS = pd.read_csv(self.path+"\\stagioni.csv", index_col=False)
+        self.SALES = SALES
+        self.PERFORMANCES = PERFORMANCES
+        self.SEASONS = SEASONS
         self.TRAIN = pd.DataFrame()
         self.VALIDATION = pd.DataFrame()
         self.TEST = pd.DataFrame()
@@ -26,7 +26,60 @@ class FeatureEngineering:
         start_date = season_row["inizio_vendite"].iloc[0]
         end_date = season_row["fine_vendite"].iloc[0]
         return start_date, end_date
-    
+
+    def add_features(self, group):
+        # Get start and end season date
+        start_date, end_date =self.get_season_dates(season_id=group["season_id"].iloc[0])
+
+        group = group.sort_values(by="date")
+
+        # Rimuovo features che non mi servono
+        group = group.drop(columns=["individuali_gruppi","online_offline"])
+
+        # Somma giornaliera dei dati delle vendite
+        group = group.groupby(['date', 'season_id', 'show_id'], as_index=False).sum()
+        show_id = group["show_id"].iloc[0]
+        
+        # Calcolo la cumulata del guadagno e del numero di biglietti venduti
+        group = add_cumulative_sum(group, column_names=["gain", "tickets"])
+        group["avg_ticket_price"] = group["gain_cum_sum"]/group["tickets_cum_sum"]
+        
+        # Add informations about the performance, and checks the product is one of the one we are interested in 
+        group = self.add_show_info(group, show_id)  
+        if not group.empty:
+            last_date = group["last_date"].iloc[0]
+            # Aggiungo i dati dei giorni mancanti (giorni senza vendite), li riempio mettendo l'ultimo valore noto
+            date_range = pd.date_range(start=group["date"].min(), end=last_date)
+            group = group.set_index("date").reindex(date_range, method="ffill")
+            group["date"] = group.index
+
+        
+            # Distanza della transazione dall'inizio e dalla fine della stagione
+            group["start_sales_distance"] = (group["date"]-start_date).dt.days.abs()
+            group["end_season_distance"] = (group["date"]-end_date).dt.days.abs()
+            group["sales_duration"] = (group["date"].max()-start_date).days
+            group["end_sales_distance"] = (group["date"].max()-group["date"]).dt.days
+            group["percentage_sales_day"] = group["start_sales_distance"]/(group["date"].max()-start_date).days
+
+        
+        
+            # Numero bigliettirimanenti per raggiungere capienza massima
+            group["remaining_tickets"] = group["performance_capacity"]-group["tickets_cum_sum"]
+            group["percentage_bought"] = group["tickets_cum_sum"]/group["performance_capacity"]
+
+            # Aggiungo medie mobili con differenti periodi
+            group = add_moving_avarages(group, ["gain_cum_sum", "tickets_cum_sum", "percentage_bought"], [2,4,6,8,10,15,20,30])
+            
+            # Aggiungo valori shiftati
+            group = add_shifted_values(group, ["gain_cum_sum", "tickets_cum_sum", "percentage_bought"], [2,4,6,8,10,15,20,30])
+
+            # Aggiungo i possibili target da prevedere:
+            group = add_targets(group, self.targets_dict)
+        else:
+            group = pd.DataFrame()
+
+        return group
+
     def create_model_input(self, train_dim = 0.6, validation_dim = 0.2):
         groups = self.SALES.groupby('show_id')
         
@@ -37,57 +90,10 @@ class FeatureEngineering:
         tr=False
         val=False
         for show_id, group in groups:
-            #print(group)
             i+=1
             counter+=1
             print(i/len_)
-            # Get start and end season date
-            start_date, end_date =self.get_season_dates(season_id=group["season_id"].iloc[0])
-
-            group = group.sort_values(by="date")
-
-            # Rimuovo features che non mi servono
-            group = group.drop(columns=["individuali_gruppi","online_offline"])
-
-            # Somma giornaliera dei dati delle vendite
-            group = group.groupby(['date', 'season_id', 'show_id'], as_index=False).sum()
-            
-            
-            # Calcolo la cumulata del guadagno e del numero di biglietti venduti
-            group = add_cumulative_sum(group, column_names=["gain", "tickets"])
-            group["avg_ticket_price"] = group["gain_cum_sum"]/group["tickets_cum_sum"]
-            
-            # Add informations about the performance, and checks the product is one of the one we are interested in 
-            group = self.add_show_info(group, show_id)  
-            if not group.empty:
-                last_date = group["last_date"].iloc[0]
-                # Aggiungo i dati dei giorni mancanti (giorni senza vendite), li riempio mettendo l'ultimo valore noto
-                date_range = pd.date_range(start=group["date"].min(), end=last_date)
-                group = group.set_index("date").reindex(date_range, method="ffill")
-                group["date"] = group.index
-
-            
-                # Distanza della transazione dall'inizio e dalla fine della stagione
-                group["start_sales_distance"] = (group["date"]-start_date).dt.days.abs()
-                group["end_season_distance"] = (group["date"]-end_date).dt.days.abs()
-                group["sales_duration"] = (group["date"].max()-start_date).days
-                group["end_sales_distance"] = (group["date"].max()-group["date"]).dt.days
-                group["percentage_sales_day"] = group["start_sales_distance"]/(group["date"].max()-start_date).days
-
-            
-            
-                # Numero bigliettirimanenti per raggiungere capienza massima
-                group["remaining_tickets"] = group["performance_capacity"]-group["tickets_cum_sum"]
-                group["percentage_bought"] = group["tickets_cum_sum"]/group["performance_capacity"]
-
-                # Aggiungo medie mobili con differenti periodi
-                group = add_moving_avarages(group, ["gain_cum_sum", "tickets_cum_sum", "percentage_bought"], [2,4,6,8,10,15,20,30])
-                
-                # Aggiungo valori shiftati
-                group = add_shifted_values(group, ["gain_cum_sum", "tickets_cum_sum", "percentage_bought"], [2,4,6,8,10,15,20,30])
-
-                # Aggiungo i possibili target da prevedere:
-                group = add_targets(group, self.targets_dict)
+            group = self.add_features(group)
             
             if len(group)>30:
                 group.to_parquet(self.path+f"\\shows\\{show_id}.gzip", index=False)
@@ -110,7 +116,8 @@ class FeatureEngineering:
         self.TRAIN.to_parquet(self.path+f"\\train_trend.gzip", index=False)
         self.VALIDATION.to_parquet(self.path+f"\\validation_trend.gzip", index=False)
         self.TEST.to_parquet(self.path+f"\\test_trend.gzip", index=False)
-        
+    
+
     def assign_types(self):
         self.SALES["gain"] = self.SALES["gain"].str.replace(",",".")
         self.SALES = self.SALES.astype({
@@ -128,7 +135,7 @@ class FeatureEngineering:
 
         self.PERFORMANCES["D_CONFIG_PROD_LIST_T_PERFORMANCE_ID"] = self.PERFORMANCES["D_CONFIG_PROD_LIST_T_PERFORMANCE_ID"].astype(int)
 
-    def get_sales(self):
+    def clean_sales(self):
         # Some columns have a space before the name, to remove it:
         self.SALES = self.SALES.rename(columns=lambda x: x.lstrip())
 
@@ -233,17 +240,21 @@ class FeatureEngineering:
         else:
             return pd.DataFrame()
 
-    def get_data(self):
+    def ingest_sales(self):
         # Remove transaction (rows) and columns I don't need
-        self.get_sales()
+        self.clean_sales()
 
         #Convert columns to the right data type
         self.assign_types()
 
-        # Create Model Input
-        self.create_model_input()
 
 if __name__ == "__main__":
     pd.set_option("display.max_columns", None)
-    feat_eng = FeatureEngineering()
-    feat_eng.get_data()
+    load_dotenv(find_dotenv())
+    path = os.environ.get("FOLDER_PATH")
+    SALES = pd.read_csv(path+"\\D_SALES_LIST_SALES.csv", index_col=False)
+    PERFORMANCES = pd.read_csv(path+"\\D_CONFIG_PROD_LIST.csv", index_col=False)
+    SEASONS = pd.read_csv(path+"\\stagioni.csv", index_col=False)
+    feat_eng = FeatureEngineering(SALES, PERFORMANCES, SEASONS)
+    feat_eng.ingest_sales()
+    feat_eng.create_model_input()

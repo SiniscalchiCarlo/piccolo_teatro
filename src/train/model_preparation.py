@@ -11,7 +11,7 @@ import pickle
 
 class ModelData(BaseModel):
     
-    df_path: str
+    df: pd.DataFrame
     features_config: Features = Features()
     train_config: TrainConfig =TrainConfig()
     df: pd.DataFrame = None
@@ -20,12 +20,6 @@ class ModelData(BaseModel):
 
     class Config:
         arbitrary_types_allowed = True
-
-    def load_df(self):
-        self.df = pd.read_parquet(self.df_path)
-        
-        #if offset is not None:
-        #    self.df =self.df.head(int(len(self.df)*offset))
 
 
 
