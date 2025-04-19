@@ -4,9 +4,9 @@ from dotenv import find_dotenv, load_dotenv
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from data_ingestion.feature_engineering import FeatureEngineering
-from train.model_preparation import ModelData
-from use_cases.trend_prediction import TrendPrediction
+from ..data_ingestion.feature_engineering import FeatureEngineering
+from ..train.model_preparation import ModelData
+from ..use_cases.trend_prediction import TrendPrediction
 
 def get_trend_prediction(show_id, estimated_sales, SALES:pd.DataFrame, PERFORMANCES:pd.DataFrame, SEASONS:pd.DataFrame):
     model_path = os.path.join(os.path.dirname(__file__), "..", "models", "XGB_trend.pkl")

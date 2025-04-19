@@ -1,7 +1,9 @@
 from pydantic import BaseModel
 from typing import List, Dict, Callable
-from utils import add_moving_avarages, add_shifted_values
 import pandas as pd
+
+from ..utils import add_moving_avarages, add_shifted_values
+
 
 class TrainConfig(BaseModel):
     periods: List[int] = [2, 4, 6, 8, 10, 15, 20, 30]

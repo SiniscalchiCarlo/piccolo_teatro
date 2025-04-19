@@ -5,7 +5,7 @@ from xgboost import XGBRegressor
 from sklearn.metrics import mean_absolute_error
 from typing import List
 
-from config import Features, TrainConfig
+from ..config import Features, TrainConfig
 import pickle
 
 

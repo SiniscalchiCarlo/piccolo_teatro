@@ -4,8 +4,8 @@ from dotenv import find_dotenv, load_dotenv
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from train.model_preparation import ModelData
-from use_cases.trend_prediction import TrendPrediction
+from ..train.model_preparation import ModelData
+from ..use_cases.trend_prediction import TrendPrediction
 
 pd.set_option("display.max_columns", None)
 load_dotenv(find_dotenv())

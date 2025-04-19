@@ -7,8 +7,8 @@ import datetime
 from pydantic import BaseModel
 import matplotlib.pyplot as plt
 
-from config import TrainConfig
-from train.model_preparation import Features, ModelData
+from ..config import TrainConfig
+from ..train.model_preparation import Features, ModelData
 
 class TrendPrediction(BaseModel):
     model: str

@@ -1,9 +1,9 @@
 import pandas as pd
-from config import FeatEngConf
 import os
 from dotenv import load_dotenv, find_dotenv
-from utils import one_hot_encode, add_cumulative_sum, add_moving_avarages, add_shifted_values, add_targets
-from datetime import datetime
+
+from ..config import FeatEngConf
+from ..utils import one_hot_encode, add_cumulative_sum, add_moving_avarages, add_shifted_values, add_targets
 
 class FeatureEngineering:
     def __init__(self, SALES: pd.DataFrame, PERFORMANCES: pd.DataFrame, SEASONS: pd.DataFrame):
