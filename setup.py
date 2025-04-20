@@ -7,6 +7,8 @@ setup(
                     fare previsioni sull'andamento di acquisto 
                     degli spettacoli""",
     author="Siniscalchi Carlo",
+    include_package_data=True,
+    package_data={"": ["*.pkl"]},
     packages=find_packages(),
     install_requires=[
         "matplotlib",
