@@ -119,7 +119,8 @@ class FeatureEngineering:
     
 
     def assign_types(self):
-        self.SALES["gain"] = self.SALES["gain"].str.replace(",",".")
+        if type(self.SALES["gain"].iloc[0]) == str:
+            self.SALES["gain"] = self.SALES["gain"].str.replace(",",".")
         self.SALES = self.SALES.astype({
             "individuali_gruppi": str,
             "online_offline": str,
@@ -128,10 +129,9 @@ class FeatureEngineering:
             "season_id": int,
             "performance_id": int,
         })
-        self.SALES["date"] = pd.to_datetime(self.SALES["date"], format='%d/%m/%Y')
-
-        self.SEASONS["inizio_vendite"] = pd.to_datetime(self.SEASONS["inizio_vendite"], format='%d/%m/%Y')
-        self.SEASONS["fine_vendite"] = pd.to_datetime(self.SEASONS["fine_vendite"], format='%d/%m/%Y')
+        self.SALES["date"] = pd.to_datetime(self.SALES["date"], errors='coerce')
+        self.SEASONS["inizio_vendite"] = pd.to_datetime(self.SEASONS["inizio_vendite"], errors='coerce')
+        self.SEASONS["fine_vendite"] = pd.to_datetime(self.SEASONS["fine_vendite"], errors='coerce')
 
         self.PERFORMANCES["D_CONFIG_PROD_LIST_T_PERFORMANCE_ID"] = self.PERFORMANCES["D_CONFIG_PROD_LIST_T_PERFORMANCE_ID"].astype(int)
 
@@ -152,6 +152,7 @@ class FeatureEngineering:
             "D_SALES_LIST_SALES_T_OPERATION_KIND": "operation_kind",
             "D_SALES_LIST_SALES_OPERATION_TYPE": "operation_type",
         })
+        print(self.SALES.columns)
 
         cols_too_keep = ["individuali_gruppi",
                                 "online_offline",
@@ -213,8 +214,12 @@ class FeatureEngineering:
         year1 = preformance_season.split(' ')[1].split('/')[0]
         year2 = "20" + preformance_season.split(' ')[1].split('/')[1]
         performances_same_show = performances_same_show.copy()
-        performances_same_show.loc[:, 'performance_date'] = performances_same_show['D_CONFIG_PROD_LIST_PRODUCT_DATE_TIME'].apply(lambda x: get_day_month(x, year1, year2))
-        performances_same_show.loc[:, "performance_date"] = pd.to_datetime(performances_same_show["performance_date"], format='%d/%m/%Y')
+        
+        if performances_same_show['D_CONFIG_PROD_LIST_PRODUCT_DATE_TIME'].iloc[0].split(" ")[0] in ["lun", "mar", "mer", "gio", "ven", "sab", "dom"]:
+            performances_same_show.loc[:, 'performance_date'] = performances_same_show['D_CONFIG_PROD_LIST_PRODUCT_DATE_TIME'].apply(lambda x: get_day_month(x, year1, year2))
+            performances_same_show.loc[:, "performance_date"] = pd.to_datetime(performances_same_show["performance_date"], format='%d/%m/%Y')
+        else:
+            performances_same_show.loc[:, 'performance_date'] = pd.to_datetime(performances_same_show["D_CONFIG_PROD_LIST_PRODUCT_DATE_TIME"], errors='coerce')
 
 
         last_date = performances_same_show["performance_date"].max()
