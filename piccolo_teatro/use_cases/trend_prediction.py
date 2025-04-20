@@ -21,13 +21,13 @@ class TrendPrediction(BaseModel):
         arbitrary_types_allowed = True
 
 
-    def trend_prediction(self, last_date: datetime, plot: bool, offset: float=None):
+    def trend_prediction(self, last_date: datetime, plot: bool = False, offset: float=None):
         
         # Calculating the predictions span
+        start_day = self.data.df["date"].iloc[-1]
         if offset is not None:
             day_offset = int(len(self.data.df)*offset)
             start_day = self.data.df.head(day_offset)["date"].iloc[-1]
-
         predictions_range = pd.date_range(start=pd.to_datetime(start_day, format="%d/%m/%Y"),
                            end=pd.to_datetime(last_date, format="%d/%m/%Y"))
         num_predictions = len(predictions_range)
@@ -44,7 +44,6 @@ class TrendPrediction(BaseModel):
             #1. MODEL PREDICTION
             input_row = self.data.X.iloc[[-1]] # Take the last known row of known data/data generated from predictions
             input_row = input_row[self.model.feature_names_in_]  # Ordering features in the order the model was trained
-            print(input_row.iloc[0])
             prediction = self.model.predict(input_row)[0]
             predictions.append(prediction)
 

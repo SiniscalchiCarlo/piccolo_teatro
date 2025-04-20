@@ -7,12 +7,11 @@ import matplotlib.pyplot as plt
 from ..data_ingestion.feature_engineering import FeatureEngineering
 from ..train.model_preparation import ModelData
 from ..use_cases.trend_prediction import TrendPrediction
+from ..models import get_trend_model
 
-def get_trend_prediction(show_id, estimated_sales, SALES:pd.DataFrame, PERFORMANCES:pd.DataFrame, SEASONS:pd.DataFrame):
+def get_trend_prediction(show_id, estimated_sales, SALES:pd.DataFrame, PERFORMANCES:pd.DataFrame, SEASONS:pd.DataFrame, offset:float=None):
     print("loading model...")
-    model_path = os.path.join(os.path.dirname(__file__), "..", "models", "XGB_trend.pkl")
-    with open(model_path, 'rb') as file:
-        model = pickle.load(file)
+    model = get_trend_model("XGB_trend")
     print("ingesting data...")
     feat_eng = FeatureEngineering(SALES, PERFORMANCES, SEASONS)
     feat_eng.ingest_sales()
@@ -25,6 +24,22 @@ def get_trend_prediction(show_id, estimated_sales, SALES:pd.DataFrame, PERFORMAN
     print("predicting...")
     performance_prediction = TrendPrediction(model=model, data=show_data)
     end_date = show_data.df["last_date"].iloc[0]
-    predictions = performance_prediction.trend_prediction(last_date=end_date)
+    predictions = performance_prediction.trend_prediction(last_date=end_date, offset=offset)
     return predictions
 
+if __name__ == "__main__":
+    pd.set_option("display.max_columns", None)
+    load_dotenv(find_dotenv())
+    path = os.environ.get("FOLDER_PATH")
+    SALES = pd.read_csv(path+"\\D_SALES_LIST_SALES.csv", index_col=False)
+    PERFORMANCES = pd.read_csv(path+"\\D_CONFIG_PROD_LIST.csv", index_col=False)
+    SEASONS = pd.read_csv(path+"\\stagioni.csv", index_col=False)
+    predictions = get_trend_prediction(
+        show_id=10228607990643,
+        estimated_sales=1000,
+        SALES=SALES,
+        PERFORMANCES=PERFORMANCES,
+        SEASONS=SEASONS,
+        offset = 0.4,
+    )
+    print(predictions)
