@@ -148,6 +148,9 @@ class FeatureEngineering:
             "D_SALES_LIST_SALES_T_PRODUCT_ID": "show_id",
             "D_SALES_LIST_SALES_T_SEASON_ID": "season_id",
             "D_SALES_LIST_SALES_T_PERFORMANCE_ID": "performance_id",
+            "D_SALES_LIST_SALES_SEASON": "season_name",
+            "D_SALES_LIST_SALES_T_OPERATION_KIND": "operation_kind",
+            "D_SALES_LIST_SALES_OPERATION_TYPE": "operation_type",
         })
 
         cols_too_keep = ["individuali_gruppi",
@@ -170,7 +173,7 @@ class FeatureEngineering:
             "SINGLE_ENTRY",
         ]
         # remoniving covid seasons
-        self.SALES = self.SALES[~self.SALES['D_SALES_LIST_SALES_SEASON'].isin(
+        self.SALES = self.SALES[~self.SALES['season_name'].isin(
             seasons_to_remove)]
 
         # removing sales of products that are not shows
