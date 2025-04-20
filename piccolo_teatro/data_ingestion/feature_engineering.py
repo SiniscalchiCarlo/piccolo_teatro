@@ -178,11 +178,11 @@ class FeatureEngineering:
 
         # removing sales of products that are not shows
         # SALES = SALES[SALES['D_SALES_LIST_SALES_T_OPERATION_KIND'] == "SIMPLE_PRODUCT"]
-        self.SALES = self.SALES[self.SALES['D_SALES_LIST_SALES_T_OPERATION_KIND'].isin(
+        self.SALES = self.SALES[self.SALES['operation_kind'].isin(
             operations_to_remove)]
         
         # considering only sales operations
-        self.SALES = self.SALES[self.SALES['D_SALES_LIST_SALES_OPERATION_TYPE'] == "Venduti"]
+        self.SALES = self.SALES[self.SALES['operation_type'] == "Venduti"]
 
         # keep only the coulmns needed
         self.SALES = self.SALES[cols_too_keep]
