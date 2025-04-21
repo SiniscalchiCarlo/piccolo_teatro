@@ -9,7 +9,7 @@ from ..train.model_preparation import ModelData
 from ..use_cases.trend_prediction import TrendPrediction
 from ..models import get_trend_model
 
-def get_trend_prediction(show_id, estimated_sales, SALES:pd.DataFrame, PERFORMANCES:pd.DataFrame, SEASONS:pd.DataFrame, offset:float=None):
+def get_trend_prediction(show_id, SALES: pd.DataFrame, PERFORMANCES:pd.DataFrame, SEASONS:pd.DataFrame, estimated_sales: float = None, offset:float=None):
     print("loading model...")
     model = get_trend_model("XGB_trend")
     print("ingesting data...")
@@ -24,8 +24,18 @@ def get_trend_prediction(show_id, estimated_sales, SALES:pd.DataFrame, PERFORMAN
     print("predicting...")
     performance_prediction = TrendPrediction(model=model, data=show_data)
     end_date = show_data.df["last_date"].iloc[0]
-    predictions = performance_prediction.trend_prediction(last_date=end_date, offset=offset)
-    return predictions
+    output = performance_prediction.trend_prediction(last_date=end_date, offset=offset)
+
+    if estimated_sales is not None:
+        start = predictions[0]
+        end = predictions[-1]
+        new_end = estimated_sales
+        scale_factor = (new_end - start) / (end - start)
+
+        scaled_predictions = [start + scale_factor * (p - start) for p in predictions] 
+        output['scaled_predictions'] = scaled_predictions
+
+    return output
 
 if __name__ == "__main__":
     pd.set_option("display.max_columns", None)

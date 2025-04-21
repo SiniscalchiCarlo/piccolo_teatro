@@ -55,5 +55,7 @@ class TrendPrediction(BaseModel):
             plt.plot(self.data.Y)
             plt.plot(predictions_range, predictions, color="red")
             plt.show()
-
-        return predictions
+        output = pd.DataFrame()
+        output["date"] = predictions_range
+        output["predictions"] = predictions
+        return output
