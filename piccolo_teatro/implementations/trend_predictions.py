@@ -27,12 +27,12 @@ def get_trend_prediction(show_id, SALES: pd.DataFrame, PERFORMANCES:pd.DataFrame
     output = performance_prediction.trend_prediction(last_date=end_date, offset=offset)
 
     if estimated_sales is not None:
-        start = predictions[0]
-        end = predictions[-1]
+        start = output["predictions"].iloc[0]
+        end = output["predictions"].iloc[-1]
         new_end = estimated_sales
         scale_factor = (new_end - start) / (end - start)
 
-        scaled_predictions = [start + scale_factor * (p - start) for p in predictions] 
+        scaled_predictions = [start + scale_factor * (p - start) for p in output["predictions"]] 
         output['scaled_predictions'] = scaled_predictions
 
     return output
