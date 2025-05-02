@@ -3,8 +3,9 @@ import os
 import pandas as pd
 from dotenv import load_dotenv, find_dotenv
 
-from config import TrainConfig
-from train.model_preparation import Features, ModelData, TrainModel
+from piccolo_teatro.train.model_preparation import Features, ModelData, TrainModel
+
+from ..config import TrainConfig
 
 
 pd.set_option('display.max_columns', None)
