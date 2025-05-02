@@ -35,7 +35,7 @@ def get_trend_prediction(show_id, SALES: pd.DataFrame, PERFORMANCES:pd.DataFrame
         scaled_predictions = [start + scale_factor * (p - start) for p in output["predictions"]] 
         output['scaled_predictions'] = scaled_predictions
 
-    return output
+    return output, show_data.df
 
 if __name__ == "__main__":
     pd.set_option("display.max_columns", None)
