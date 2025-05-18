@@ -1,4 +1,4 @@
-from .trend_predictions import get_trend_prediction
+from piccolo_teatro.implementations.trend_predictions import get_trend_prediction
 import pandas as pd
 import plotly.graph_objects as go
 import matplotlib.pyplot as plt
