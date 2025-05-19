@@ -1,3 +1,17 @@
+# Prolog - Auto Generated #
+import os, uuid, matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot
+import pandas
+
+import sys
+
+os.chdir(u'C:/Users/39370/PythonEditorWrapper_6b21d22e-9446-479a-861b-4298711a8dee')
+dataset = pandas.read_csv('input_df_26387f20-2361-4a83-a773-b106ea28deb0.csv')
+
+matplotlib.pyplot.figure(figsize=(5.55555555555556,4.16666666666667), dpi=72)
+matplotlib.pyplot.show = lambda args=None,kw=None: matplotlib.pyplot.savefig(str(uuid.uuid1()))
+# Original Script. Please update your script content here and once completed copy below section back to the original editing window #
 # Il codice seguente consente di creare un dataframe e rimuovere righe duplicate e viene sempre eseguito e funge da preambolo per lo script: 
 
 # dataset = pandas.DataFrame(Individuali/Gruppi, T_SEASON_ID, T_PRODUCT_ID, T_PERFORMANCE_ID, Tipologia canale, TOTAL_CURRENT_AMT_ITX, Anno, Trimestre, Mese, Giorno, Anno.1, Trimestre.1, Mese.1, Giorno.1, Anno.2, Trimestre.2, Mese.2, Giorno.2, CURRENT_QUANTITY)
@@ -7,7 +21,7 @@
 import pandas as pd
 import plotly.graph_objects as go
 import matplotlib.pyplot as plt
-from piccolo_teatro.implementations.trend_predictions import get_trend_prediction
+from ..implementations.trend_predictions import get_trend_prediction
 
 
 def powerbi_visual(dataset, static = True):
@@ -44,7 +58,6 @@ def powerbi_visual(dataset, static = True):
         "SEASON.1",
         "T_SEASON_ID",
     ]
-
     SALES = dataset[sales_cols].copy()
     SALES = SALES.rename(columns={'SEASON.1': 'SEASON', "Individuali/Gruppi": "Individuali_Gruppi", "Tipologia canale": "Tipologia_canale"})
     SALES.columns = ["D_SALES_LIST_SALES_"+col for col in SALES.columns]
@@ -70,12 +83,14 @@ def powerbi_visual(dataset, static = True):
     target_incasso = float(dataset["OBIETTIVO INCASSO"].iloc[0])
     k = (target_incasso/target_perc)*100
     product_name = dataset["PRODUCT_EXTERNAL_NAME"].iloc[-1]
-    prediction_df,_ = get_trend_prediction(show_id=show_id, 
+    prediction_df, show_df = get_trend_prediction(show_id=show_id, 
                                         estimated_sales=target_incasso, 
                                         SALES=SALES, 
                                         PERFORMANCES=PERFORMANCES, 
-                                        SEASONS=SEASONS,
-                                        offset=0.4)
+                                        SEASONS=SEASONS)
+    print("SHOW DF", show_df)
+    plt.plot(show_df["percentage_sales_day"])
+    plt.show()
     k=target_incasso/target_perc
 
     if static:
@@ -107,4 +122,7 @@ def powerbi_visual(dataset, static = True):
 
         fig.show()
 
-powerbi_visual(dataset, static=False)
+powerbi_visual(dataset, static=True)
+
+# Epilog - Auto Generated #
+os.chdir(u'C:/Users/39370/PythonEditorWrapper_6b21d22e-9446-479a-861b-4298711a8dee')

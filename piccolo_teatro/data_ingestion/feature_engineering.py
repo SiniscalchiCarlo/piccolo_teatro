@@ -27,7 +27,7 @@ class FeatureEngineering:
         end_date = season_row["fine_vendite"].iloc[0]
         return start_date, end_date
 
-    def add_features(self, group):
+    def add_features(self, group, fill_to_show_date=True):
         # Get start and end season date
         start_date, end_date =self.get_season_dates(season_id=group["season_id"].iloc[0])
 
@@ -47,7 +47,10 @@ class FeatureEngineering:
         # Add informations about the performance, and checks the product is one of the one we are interested in 
         group = self.add_show_info(group, show_id)  
         if not group.empty:
-            last_date = group["last_date"].iloc[0]
+            if fill_to_show_date:
+                last_date = group["last_date"].iloc[0]
+            else:
+                last_date = group["date"].iloc[-1]
             # Aggiungo i dati dei giorni mancanti (giorni senza vendite), li riempio mettendo l'ultimo valore noto
             date_range = pd.date_range(start=group["date"].min(), end=last_date)
             group = group.set_index("date").reindex(date_range, method="ffill")
@@ -63,7 +66,7 @@ class FeatureEngineering:
 
         
         
-            # Numero bigliettirimanenti per raggiungere capienza massima
+            # Numero biglietti rimanenti per raggiungere capienza massima
             group["remaining_tickets"] = group["performance_capacity"]-group["tickets_cum_sum"]
             group["percentage_bought"] = group["tickets_cum_sum"]/group["performance_capacity"]
 

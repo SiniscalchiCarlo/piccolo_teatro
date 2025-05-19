@@ -23,8 +23,9 @@ for show_id in performances:
     print(show_id, i/len_performances)
     df = pd.read_parquet(path+f"\\shows\\{show_id}_target.gzip")
 
-    performance_df = pd.read_parquet(path+f"\\shows\\{show_id}.gzip")    
+    performance_df = pd.read_parquet(path+f"\\shows\\{show_id}.gzip")   
+    performance_df = performance_df.iloc[:-100]
     performance_data = ModelData(df=performance_df)
     performance_prediction = TrendPrediction(model=model, data=performance_data)
     end_date = performance_data.df["last_date"].iloc[0]
-    performance_prediction.trend_prediction(last_date=end_date, plot=True, offset=0.4)
+    performance_prediction.trend_prediction(last_date=end_date, plot=True)

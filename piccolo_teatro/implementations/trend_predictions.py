@@ -17,15 +17,19 @@ def get_trend_prediction(show_id, SALES: pd.DataFrame, PERFORMANCES:pd.DataFrame
     feat_eng.ingest_sales()
     print("adding features...")
     show_df = feat_eng.SALES[feat_eng.SALES["show_id"]==show_id]
-    show_df = feat_eng.add_features(show_df)
+    show_df = feat_eng.add_features(show_df, fill_to_show_date=False)
 
     print("creating model data...")
+    print(show_df)
     show_data = ModelData(df=show_df)
     print("predicting...")
     performance_prediction = TrendPrediction(model=model, data=show_data)
     end_date = show_data.df["last_date"].iloc[0]
     output = performance_prediction.trend_prediction(last_date=end_date, offset=offset)
-
+    print("OUTPUt",output["predictions"])
+    
+    #plt.plot(output["predictions"])
+    #plt.show()
     if estimated_sales is not None:
         start = output["predictions"].iloc[0]
         end = output["predictions"].iloc[-1]
