@@ -14,15 +14,15 @@ class FeatureEngineering:
         self.encoding_dict = self.feat_eng_conf.encoding_dict
         self.targets_dict = self.feat_eng_conf.targets_dict
 
-        self.SALES = SALES
-        self.PERFORMANCES = PERFORMANCES
-        self.SEASONS = SEASONS
+        self.sales_df = SALES
+        self.performances_df = PERFORMANCES
+        self.seasons_df = SEASONS
         self.TRAIN = pd.DataFrame()
         self.VALIDATION = pd.DataFrame()
         self.TEST = pd.DataFrame()
 
     def get_season_dates(self, season_id: str):
-        season_row = self.SEASONS[self.SEASONS["season_id"] == season_id]
+        season_row = self.seasons_df[self.seasons_df["season_id"] == season_id]
         start_date = season_row["inizio_vendite"].iloc[0]
         end_date = season_row["fine_vendite"].iloc[0]
         return start_date, end_date
@@ -69,7 +69,6 @@ class FeatureEngineering:
             # Numero biglietti rimanenti per raggiungere capienza massima
             group["remaining_tickets"] = group["performance_capacity"]-group["tickets_cum_sum"]
             group["percentage_bought"] = group["tickets_cum_sum"]/group["performance_capacity"]
-
             # Aggiungo medie mobili con differenti periodi
             group = add_moving_avarages(group, ["gain_cum_sum", "tickets_cum_sum", "percentage_bought"], [2,4,6,8,10,15,20,30])
             
@@ -84,7 +83,7 @@ class FeatureEngineering:
         return group
 
     def create_model_input(self, train_dim = 0.6, validation_dim = 0.2):
-        groups = self.SALES.groupby('show_id')
+        groups = self.sales_df.groupby('show_id')
         
 
         i=0
@@ -122,9 +121,9 @@ class FeatureEngineering:
     
 
     def assign_types(self):
-        if type(self.SALES["gain"].iloc[0]) == str:
-            self.SALES["gain"] = self.SALES["gain"].str.replace(",",".")
-        self.SALES = self.SALES.astype({
+        if type(self.sales_df["gain"].iloc[0]) == str:
+            self.sales_df["gain"] = self.sales_df["gain"].str.replace(",",".")
+        self.sales_df = self.sales_df.astype({
             "individuali_gruppi": str,
             "online_offline": str,
             "gain": float,
@@ -132,17 +131,17 @@ class FeatureEngineering:
             "season_id": int,
             "performance_id": int,
         })
-        self.SALES["date"] = pd.to_datetime(self.SALES["date"], errors='coerce')
-        self.SEASONS["inizio_vendite"] = pd.to_datetime(self.SEASONS["inizio_vendite"], errors='coerce')
-        self.SEASONS["fine_vendite"] = pd.to_datetime(self.SEASONS["fine_vendite"], errors='coerce')
+        self.sales_df["date"] = pd.to_datetime(self.sales_df["date"], errors='coerce')
+        self.seasons_df["inizio_vendite"] = pd.to_datetime(self.seasons_df["inizio_vendite"], errors='coerce')
+        self.seasons_df["fine_vendite"] = pd.to_datetime(self.seasons_df["fine_vendite"], errors='coerce')
 
-        self.PERFORMANCES["D_CONFIG_PROD_LIST_T_PERFORMANCE_ID"] = self.PERFORMANCES["D_CONFIG_PROD_LIST_T_PERFORMANCE_ID"].astype(int)
+        self.performances_df["D_CONFIG_PROD_LIST_T_PERFORMANCE_ID"] = self.performances_df["D_CONFIG_PROD_LIST_T_PERFORMANCE_ID"].astype(int)
 
     def clean_sales(self):
         # Some columns have a space before the name, to remove it:
-        self.SALES = self.SALES.rename(columns=lambda x: x.lstrip())
+        self.sales_df = self.sales_df.rename(columns=lambda x: x.lstrip())
 
-        self.SALES = self.SALES.rename(columns={
+        self.sales_df = self.sales_df.rename(columns={
             "D_SALES_LIST_SALES_Individuali_Gruppi": "individuali_gruppi",
             "D_SALES_LIST_SALES_Tipologia_canale": "online_offline",
             "D_SALES_LIST_SALES_TOTAL_CURRENT_AMT_ITX": "gain",
@@ -155,7 +154,7 @@ class FeatureEngineering:
             "D_SALES_LIST_SALES_T_OPERATION_KIND": "operation_kind",
             "D_SALES_LIST_SALES_OPERATION_TYPE": "operation_type",
         })
-        print(self.SALES.columns)
+        print(self.sales_df.columns)
 
         cols_too_keep = ["individuali_gruppi",
                                 "online_offline",
@@ -167,33 +166,34 @@ class FeatureEngineering:
                                 "performance_id",
                                 ]
         
-        seasons_to_remove = ["Stagione 2014/15",
-                            "Stagione 2019/20",
-                            "Stagione 2020/21",
-                            "Stagione 2021/22"]
+        seasons_to_remove = [1346872739,
+                            2070233463,
+                            1112493566,
+                            1098863756]
                             
         operations_to_remove = [
             "PRODUCT_COMPOSITION",
             "SINGLE_ENTRY",
         ]
         # remoniving covid seasons
-        self.SALES = self.SALES[~self.SALES['season_name'].isin(
-            seasons_to_remove)]
+        self.sales_df['season_id'] = self.sales_df['season_id'].astype(int)
+
+        self.sales_df = self.sales_df[~self.sales_df['season_id'].isin(seasons_to_remove)]
 
         # removing sales of products that are not shows
         # SALES = SALES[SALES['D_SALES_LIST_SALES_T_OPERATION_KIND'] == "SIMPLE_PRODUCT"]
-        self.SALES = self.SALES[self.SALES['operation_kind'].isin(
+        self.sales_df = self.sales_df[self.sales_df['operation_kind'].isin(
             operations_to_remove)]
         
         # considering only sales operations
-        self.SALES = self.SALES[self.SALES['operation_type'] == "Venduti"]
+        self.sales_df = self.sales_df[self.sales_df['operation_type'] == "Venduti"]
 
         # keep only the coulmns needed
-        self.SALES = self.SALES[cols_too_keep]
+        self.sales_df = self.sales_df[cols_too_keep]
 
 
     def add_show_info(self, group, show_id):
-        performances_same_show = self.PERFORMANCES[self.PERFORMANCES["D_CONFIG_PROD_LIST_T_PRODUCT_ID"]==show_id]
+        performances_same_show = self.performances_df[self.performances_df["D_CONFIG_PROD_LIST_T_PRODUCT_ID"]==show_id]
         performance_state = performances_same_show["D_CONFIG_PROD_LIST_PERFORMANCE_STATE"].iloc[0]
         performance_type = performances_same_show["D_CONFIG_PROD_LIST_Tipologia_spettacolo"].iloc[0]
         preformance_season = performances_same_show["D_CONFIG_PROD_LIST_SEASON"].iloc[0]
@@ -228,7 +228,7 @@ class FeatureEngineering:
         last_date = performances_same_show["performance_date"].max()
 
         # Get all the performances of the same show
-        performances_same_show = self.PERFORMANCES[self.PERFORMANCES["D_CONFIG_PROD_LIST_T_PRODUCT_ID"]==show_id].copy()
+        performances_same_show = self.performances_df[self.performances_df["D_CONFIG_PROD_LIST_T_PRODUCT_ID"]==show_id].copy()
 
         performances_to_not_consider = [
             "Evento collaterale",

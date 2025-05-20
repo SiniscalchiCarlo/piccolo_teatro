@@ -17,19 +17,16 @@ def get_trend_prediction(show_id, SALES: pd.DataFrame, PERFORMANCES:pd.DataFrame
     feat_eng.ingest_sales()
     print("adding features...")
     show_df = feat_eng.SALES[feat_eng.SALES["show_id"]==show_id]
-    show_df = feat_eng.add_features(show_df, fill_to_show_date=False)
+    df_all_features = feat_eng.add_features(show_df, fill_to_show_date=False)
 
     print("creating model data...")
-    print(show_df)
-    show_data = ModelData(df=show_df)
+    show_data = ModelData(df=df_all_features.copy())
     print("predicting...")
     performance_prediction = TrendPrediction(model=model, data=show_data)
     end_date = show_data.df["last_date"].iloc[0]
     output = performance_prediction.trend_prediction(last_date=end_date, offset=offset)
-    print("OUTPUt",output["predictions"])
+    print("OUTPUT",output["predictions"])
     
-    #plt.plot(output["predictions"])
-    #plt.show()
     if estimated_sales is not None:
         start = output["predictions"].iloc[0]
         end = output["predictions"].iloc[-1]
@@ -39,7 +36,7 @@ def get_trend_prediction(show_id, SALES: pd.DataFrame, PERFORMANCES:pd.DataFrame
         scaled_predictions = [start + scale_factor * (p - start) for p in output["predictions"]] 
         output['scaled_predictions'] = scaled_predictions
 
-    return output, show_data.df
+    return output, df_all_features
 
 if __name__ == "__main__":
     pd.set_option("display.max_columns", None)

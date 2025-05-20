@@ -2,7 +2,29 @@ from pydantic import BaseModel
 from typing import List, Dict, Callable
 import pandas as pd
 
-from ..utils import add_moving_avarages, add_shifted_values
+
+def add_moving_avarages(df, column_names: list[str], periods: list[int]) -> dict:
+    result = {}
+    for period in periods:
+        for col_name in column_names:
+            col_avg = df[col_name].rolling(period).mean()
+            last_val = col_avg.iloc[-1]
+            # If NaN (due to short length), fill with first value
+            if pd.isna(last_val):
+                last_val = df[col_name].iloc[0]
+            result[col_name + f"_avg_{period}"] = last_val
+    return result
+
+def add_shifted_values(df, column_names: list[str], periods: list[int]) -> dict:
+    result = {}
+    for period in periods:
+        for col_name in column_names:
+            shifted_val = df[col_name].shift(period).iloc[-1]
+            # If NaN (e.g. shift out of bounds), fill with first value
+            if pd.isna(shifted_val):
+                shifted_val = df[col_name].iloc[0]
+            result[col_name + f"_shifted_{period}"] = shifted_val
+    return result
 
 
 class TrainConfig(BaseModel):
@@ -31,11 +53,11 @@ class Feature(BaseModel):
     update: Callable = None
 
 class Features:
-    def __init__(self):
+    def __init__(self, df=None):
         self.train_config = TrainConfig()
         self.feat_eng_conf = FeatEngConf()
-        self.input_df = None
-        self.prediction = None
+        self.df = df
+        self.new_predicition = None
 
         # Initialization of constant features
         self.performance_type: Feature = Feature(columns=self.feat_eng_conf.encoding_dict["performance_type"],
@@ -117,10 +139,12 @@ class Features:
         self.__get_features()
 
         
-    def update_features(self, input_df, prediction):
-        self.input_df = input_df
-        self.prediction = prediction
-        self.updated_df = pd.DataFrame()
+    def update_features(self, prediction):
+
+        if self.df is None:
+            raise Exception("Please add a input df to Feature class before calling update_features")
+        self.new_predicition = prediction
+        self.new_row = {}
 
         for feature in self.variable_features:
             update_function = feature.update
@@ -129,6 +153,9 @@ class Features:
         for feature in self.const_features:
             update_function = feature.update
             update_function(feature.columns[0])
+
+        self.new_row = pd.DataFrame(self.new_row)
+        self.df = pd.concat([self.df, self.new_row], ignore_index=True)
 
     def __get_features(self):
         """
@@ -170,37 +197,32 @@ class Features:
 
 
     def __update_const(self, col_name):
-        const_val = self.input_df[col_name].iloc[-1]
-        self.updated_df[col_name] = const_val
+        const_val = self.df[col_name].iloc[-1]
+        self.new_row[col_name] = [const_val]
 
     def __update_percentage_bought(self):
-        targets_and_predictions = self.input_df["percentage_bought"].tolist() + [self.prediction]
-        self.updated_df["percentage_bought"] = targets_and_predictions
+        self.new_row["percentage_bought"] = [self.new_predicition]
 
     def __update_percentage_bought_avg(self):
-        self.updated_df = add_moving_avarages(self.updated_df, ["percentage_bought"], self.train_config.periods)
+        self.new_row.update(add_moving_avarages(self.df, ["percentage_bought"], self.train_config.periods))
 
     def __update_percentage_bought_shifted(self):
-        self.updated_df = add_shifted_values(self.updated_df, ["percentage_bought"], self.train_config.periods)
+        self.new_row.update(add_shifted_values(self.df, ["percentage_bought"], self.train_config.periods))
 
     def __update_start_sales_distance(self):
-        last_row = self.input_df.iloc[[-1]]
+        last_row = self.df.iloc[[-1]]
         new_value = float(last_row["start_sales_distance"].iloc[0]) + 1
-        values = self.input_df["start_sales_distance"].tolist()
-        values.append(new_value)
-        self.updated_df["start_sales_distance"] = values
+
+        self.new_row["start_sales_distance"] = [new_value]
 
     def __update_end_sales_distance(self):
-        last_row = self.input_df.iloc[[-1]]
-        new_value = float(last_row["end_sales_distance"].iloc[0]) -1
-        values = self.input_df["end_sales_distance"].tolist()
-        values.append(new_value)
-        self.updated_df["end_sales_distance"] = values
+        last_row = self.df.iloc[[-1]]
+        new_value = int(last_row["end_sales_distance"].iloc[0]) -1
+        self.new_row["end_sales_distance"] = [new_value]
     
     def __update_percentage_sales_day(self):
-        last_row = self.input_df.iloc[[-1]]
-        increased_day = float(last_row["start_sales_distance"].iloc[0]) + 1
-        values = self.input_df["percentage_sales_day"].tolist()
-        values.append(increased_day/self.input_df["sales_duration"].iloc[0])
-        self.updated_df["percentage_sales_day"] = values
+        last_row = self.df.iloc[[-1]]
+        increased_day = int(last_row["start_sales_distance"].iloc[0]) + 1
+        new_value = increased_day/self.df["sales_duration"].iloc[0]
+        self.new_row["percentage_sales_day"] = [new_value]
         

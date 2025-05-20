@@ -13,7 +13,7 @@ class ModelData(BaseModel):
     
     df: pd.DataFrame
     features_config: Features = Features()
-    train_config: TrainConfig =TrainConfig()
+    train_config: TrainConfig = TrainConfig()
     df: pd.DataFrame = None
     X: pd.DataFrame = None
     Y: pd.DataFrame = None

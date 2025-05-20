@@ -24,10 +24,13 @@ class TrendPrediction(BaseModel):
     def trend_prediction(self, last_date: datetime, plot: bool = False, offset: float=None):
         
         # Calculating the predictions span
-        start_day = self.data.df["date"].iloc[-1]
+        start_day = self.data.df["date"].iloc[-2]
         if offset is not None:
             day_offset = int(len(self.data.df)*offset)
-            start_day = self.data.df.head(day_offset)["date"].iloc[-1]
+            print("day_offset day_offset day_offset day_offset", day_offset)
+            start_day = self.data.df["date"].iloc[day_offset]
+            print("START DAY",start_day)
+
         predictions_range = pd.date_range(start=pd.to_datetime(start_day, format="%d/%m/%Y"),
                            end=pd.to_datetime(last_date, format="%d/%m/%Y"))
         num_predictions = len(predictions_range)
@@ -38,7 +41,9 @@ class TrendPrediction(BaseModel):
 
         if offset is not None:
             self.data.X = self.data.X.head(day_offset)
-
+        #self.data.X = self.data.X.tail(91)
+        print("START DAY", start_day)
+        print( self.data.X)
         predictions = []
         for i in range(num_predictions):
             #1. MODEL PREDICTION

@@ -5,12 +5,12 @@ import matplotlib.pyplot
 import pandas
 
 import sys
-sys.tracebacklimit = 0
 
 os.chdir(u'C:/Users/39370/PythonEditorWrapper_9926174e-931f-4b65-98a3-b8328749f53d')
 dataset = pandas.read_csv('input_df_a6a786ea-4685-45ea-809b-c22118abcfa1.csv')
 
-from ..implementations.trend_predictions import get_trend_prediction
+from .trend_prediction2 import trend_prediction
+from ..data_ingestion.raw_data import Sales, Products, Seasons
 import pandas as pd
 import plotly.graph_objects as go
 import matplotlib.pyplot as plt
@@ -74,10 +74,10 @@ def powerbi_visual(dataset, static = True):
     print("SALES", REAL_SALES)
 
     pd.set_option("display.max_columns", None)
-    PERFORMANCES = dataset[performances_cols].copy()
-    PERFORMANCES = PERFORMANCES.rename(columns={'Tipologia spettacolo': 'Tipologia_spettacolo'})
+    PRODUCTS = dataset[performances_cols].copy()
+    PRODUCTS = PRODUCTS.rename(columns={'Tipologia spettacolo': 'Tipologia_spettacolo'})
 
-    PERFORMANCES.columns = ["D_CONFIG_PROD_LIST_"+col for col in PERFORMANCES.columns]
+    PRODUCTS.columns = ["D_CONFIG_PROD_LIST_"+col for col in PRODUCTS.columns]
 
     SEASONS = dataset[seasons_cols].copy()
     SEASONS = SEASONS.rename(columns={
@@ -95,28 +95,25 @@ def powerbi_visual(dataset, static = True):
     k = (target_incasso/target_perc)*100
     product_name = dataset["PRODUCT_EXTERNAL_NAME"].iloc[-1]
     
-    real_time_prediction,show_data = get_trend_prediction(show_id=show_id, 
-                                        estimated_sales=target_incasso, 
-                                        SALES=SALES, 
-                                        PERFORMANCES=PERFORMANCES, 
-                                        SEASONS=SEASONS,
-                                        offset=OFFSET)
-    currente_days_range = (real_time_prediction['date'].iloc[-1]-real_time_prediction['date'].iloc[0]).days
+    sales = Sales(SALES)
+    products = Products(PRODUCTS)
+    seasons = Seasons(SEASONS)
 
-    if currente_days_range/show_data['sales_duration'].iloc[0]>=OFFSET:
-        fixed_prediction,_ = get_trend_prediction(show_id=show_id, 
-                                            estimated_sales=target_incasso, 
-                                            SALES=SALES, 
-                                            PERFORMANCES=PERFORMANCES, 
-                                            SEASONS=SEASONS,
-                                            offset=OFFSET)
+    sales.get_same_show(show_id=show_id)
+
+    sales.clean()
+    products.clean()
+    seasons.clean()
+
+    fixed_prediction_df, all_trend = trend_prediction(sales, products, seasons, offset=0.3)
+
+
     k=target_incasso/target_perc
     
     if static:
         plt.figure(figsize=(12, 6))
-        plt.plot(REAL_SALES['D_SALES_LIST_SALES_TOTAL_CURRENT_AMT_ITX_cum_sum'], label='Vendite Effettive', linewidth=2)
-        plt.plot(real_time_prediction['date'], real_time_prediction['predictions'] * k, label='Predizione', linewidth=2)
-        plt.plot(fixed_prediction['date'], fixed_prediction['scaled_predictions'], label='Obiettivo', linewidth=2, linestyle='--')
+        plt.plot(fixed_prediction_df["predictions"], label='Obiettivo', linewidth=2)
+        plt.plot(all_trend, label='Vendite Effettive', linewidth=2)
 
         # Layout and labels
         plt.title(f'Previsione incassi {product_name}', fontsize=16)
@@ -127,19 +124,19 @@ def powerbi_visual(dataset, static = True):
         plt.tight_layout()
         plt.xticks(rotation=45)
         plt.show()
-    else:
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(x=real_time_prediction['REFERENCE_DATE'], y=real_time_prediction['Cumulata incassi']*k, mode='lines', name='Predizione'))
-        fig.add_trace(go.Scatter(x=real_time_prediction['date'], y=real_time_prediction['predictions']*k, mode='lines', name='Predizione'))
-        fig.add_trace(go.Scatter(x=fixed_prediction['date'], y=fixed_prediction['scaled_predictions'], mode='lines', name='Obiettivo'))
+    # else:
+    #     fig = go.Figure()
+    #     fig.add_trace(go.Scatter(x=real_time_prediction['REFERENCE_DATE'], y=real_time_prediction['Cumulata incassi']*k, mode='lines', name='Predizione'))
+    #     fig.add_trace(go.Scatter(x=real_time_prediction['date'], y=real_time_prediction['predictions']*k, mode='lines', name='Predizione'))
+    #     fig.add_trace(go.Scatter(x=fixed_prediction['date'], y=fixed_prediction['scaled_predictions'], mode='lines', name='Obiettivo'))
 
-        fig.update_layout(
-            title=f'Previsione incassi {product_name}',
-            xaxis_title='Date',
-            yaxis_title='Value',
-            hovermode='x unified'
-        )
+    #     fig.update_layout(
+    #         title=f'Previsione incassi {product_name}',
+    #         xaxis_title='Date',
+    #         yaxis_title='Value',
+    #         hovermode='x unified'
+    #     )
 
-        fig.show()
+    #     fig.show()
 
 powerbi_visual(dataset, static=True)
