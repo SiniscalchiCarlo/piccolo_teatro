@@ -24,7 +24,7 @@ def trend_prediction(sales: Sales, products: Products, seasons: Seasons, offset=
                     fill_to_show_date=False)
     else:
         raise Exception("Sales transactions are not all from the same show")
-    
+    print("ALL DATA", all_data)
     all_trend = all_data["percentage_bought"].copy()
     if offset != None:
         known_data = all_data.head(int(len(all_data) * offset)).copy()
@@ -66,7 +66,7 @@ def trend_prediction(sales: Sales, products: Products, seasons: Seasons, offset=
 
 
 if __name__ == "__main__":
-    pd.set_option("display.max_columns", None)
+    #pd.set_option("display.max_columns", None)
 
     SALES = pd.read_csv(path+"\\D_SALES_LIST_SALES.csv", index_col=False)
     PRODUCTS = pd.read_csv(path+"\\D_CONFIG_PROD_LIST.csv", index_col=False)
@@ -78,6 +78,8 @@ if __name__ == "__main__":
     ids = random.sample(ids, k=len(ids))
     
     for show_id in ids:
+        print("SHOW ID", show_id)
+        show_id = 10228544662578
         # Ingesting and cleaning data
         sales = Sales(SALES)
         products = Products(PRODUCTS)
@@ -88,6 +90,13 @@ if __name__ == "__main__":
         sales.clean()
         products.clean()
         seasons.clean()
+        sales.sort_values()
+        sales.df.to_csv(r"C:\Users\39370\Downloads\verifica_transazioni.csv")
+        print("BEFORE GROUP BY",sales.df, len(sales.df), sum(sales.df["tickets"]))
+    
+        prediction_df, all_trend = trend_prediction(sales, products, seasons, offset=0.3)
+        plt.plot(prediction_df["predictions"])
+        plt.plot(all_trend)
+        plt.show()
 
-        trend_prediction(model, sales, products, seasons, offset=0.3)
 

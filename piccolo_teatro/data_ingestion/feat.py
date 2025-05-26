@@ -90,6 +90,7 @@ def add_features(seasons: Seasons, products: Products, sales: Sales, fill_to_sho
         df = df.drop(columns=["individuali_gruppi","online_offline"])
 
         # Somma giornaliera dei dati delle vendite
+        print("BEFORE GROUP BY",df, len(df), sum(df["tickets"]))
         df = df.groupby(['date', 'season_id', 'show_id'], as_index=False).sum()
         show_id = df["show_id"].iloc[0]
         

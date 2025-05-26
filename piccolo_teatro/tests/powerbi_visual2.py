@@ -9,11 +9,14 @@ import sys
 os.chdir(u'C:/Users/39370/PythonEditorWrapper_9926174e-931f-4b65-98a3-b8328749f53d')
 dataset = pandas.read_csv('input_df_a6a786ea-4685-45ea-809b-c22118abcfa1.csv')
 
-from .trend_prediction2 import trend_prediction
-from ..data_ingestion.raw_data import Sales, Products, Seasons
+# from .trend_prediction2 import trend_prediction
+# from ..data_ingestion.raw_data import Sales, Products, Seasons
+from piccolo_teatro.tests.trend_prediction2 import trend_prediction
+from piccolo_teatro.data_ingestion.raw_data import Sales, Products, Seasons
 import pandas as pd
 import plotly.graph_objects as go
 import matplotlib.pyplot as plt
+
 
 def add_cumulative_sum(df, column_names: list[str], time_col: str):
     output = df.copy()
@@ -65,13 +68,11 @@ def powerbi_visual(dataset, static = True):
         "SEASON.1",
         "T_SEASON_ID",
     ]
-    print("DATASET",dataset)
+    print("DATASET",dataset["T_PERFORMANCE_ID"])
     SALES = dataset[sales_cols].copy()
     SALES = SALES.rename(columns={'SEASON.1': 'SEASON', "Individuali/Gruppi": "Individuali_Gruppi", "Tipologia canale": "Tipologia_canale"})
     SALES.columns = ["D_SALES_LIST_SALES_"+col for col in SALES.columns]
     REAL_SALES = add_cumulative_sum(SALES, column_names=["D_SALES_LIST_SALES_TOTAL_CURRENT_AMT_ITX"], time_col="D_SALES_LIST_SALES_REFERENCE_DATE")
-
-    print("SALES", REAL_SALES)
 
     pd.set_option("display.max_columns", None)
     PRODUCTS = dataset[performances_cols].copy()
@@ -90,11 +91,6 @@ def powerbi_visual(dataset, static = True):
     })
     show_id = int(dataset["T_PRODUCT_ID"].iloc[0])
 
-    target_perc = float(dataset["OBIETTIVO RIEMPIMENTO"].iloc[0])
-    target_incasso = float(dataset["OBIETTIVO INCASSO"].iloc[0])
-    k = (target_incasso/target_perc)*100
-    product_name = dataset["PRODUCT_EXTERNAL_NAME"].iloc[-1]
-    
     sales = Sales(SALES)
     products = Products(PRODUCTS)
     seasons = Seasons(SEASONS)
@@ -105,38 +101,11 @@ def powerbi_visual(dataset, static = True):
     products.clean()
     seasons.clean()
 
-    fixed_prediction_df, all_trend = trend_prediction(sales, products, seasons, offset=0.3)
-
-
-    k=target_incasso/target_perc
-    
-    if static:
-        plt.figure(figsize=(12, 6))
-        plt.plot(fixed_prediction_df["predictions"], label='Obiettivo', linewidth=2)
-        plt.plot(all_trend, label='Vendite Effettive', linewidth=2)
-
-        # Layout and labels
-        plt.title(f'Previsione incassi {product_name}', fontsize=16)
-        plt.xlabel('Date', fontsize=12)
-        plt.ylabel('Value', fontsize=12)
-        plt.legend()
-        plt.grid(True, alpha=0.5)
-        plt.tight_layout()
-        plt.xticks(rotation=45)
-        plt.show()
-    # else:
-    #     fig = go.Figure()
-    #     fig.add_trace(go.Scatter(x=real_time_prediction['REFERENCE_DATE'], y=real_time_prediction['Cumulata incassi']*k, mode='lines', name='Predizione'))
-    #     fig.add_trace(go.Scatter(x=real_time_prediction['date'], y=real_time_prediction['predictions']*k, mode='lines', name='Predizione'))
-    #     fig.add_trace(go.Scatter(x=fixed_prediction['date'], y=fixed_prediction['scaled_predictions'], mode='lines', name='Obiettivo'))
-
-    #     fig.update_layout(
-    #         title=f'Previsione incassi {product_name}',
-    #         xaxis_title='Date',
-    #         yaxis_title='Value',
-    #         hovermode='x unified'
-    #     )
-
-    #     fig.show()
+    prediction_df, all_trend = trend_prediction(sales, products, seasons, offset=0.3)
+    print(all_trend)
+    print("SHOW ID", show_id)
+    plt.plot(prediction_df["predictions"])
+    plt.plot(all_trend)
+    plt.show()
 
 powerbi_visual(dataset, static=True)
