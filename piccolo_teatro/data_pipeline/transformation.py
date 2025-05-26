@@ -3,8 +3,8 @@ import os
 from dotenv import load_dotenv, find_dotenv
 
 from ..config import FeatEngConf
-from ..utils import one_hot_encode, add_cumulative_sum, add_moving_avarages, add_shifted_values, add_targets
-from ..data_ingestion.raw_data import Sales, Products, Seasons
+from .utils import one_hot_encode, add_cumulative_sum, add_moving_avarages, add_shifted_values, add_targets
+from .ingestion import Sales, Products, Seasons
 import logging
 logger = logging.getLogger(__name__)
 
@@ -22,6 +22,9 @@ def get_season_dates(seasons_df, season_id: str):
     return start_date, end_date
 
 def add_show_info(products_df, df, show_id):
+    '''
+    This functions enriches the dataframe by adding informations about shows (hour, number of tickes...)
+    '''
     performances_same_show = products_df[products_df["show_id"]==show_id]
     performance_state = performances_same_show["performance_state"].iloc[0]
     performance_type = performances_same_show["show_type"].iloc[0]
@@ -80,20 +83,27 @@ def add_show_info(products_df, df, show_id):
     else:
         return pd.DataFrame()
         
-def add_features(seasons: Seasons, products: Products, sales: Sales, fill_to_show_date=True):
-        df = sales.df.copy()
+def add_features(seasons: Seasons, products: Products, df: pd.DataFrame, fill_to_show_date=True):
+        '''
+        This function is called to enrich the sales dataframe with new features, 
+        ensuring it contains all the features that might be needed.
+        '''
+
+        if df['show_id'].nunique() != 1:
+            raise Exception("Error: passed to 'add_features()' sales that are not all from the same show")
+        
         df = df.sort_values(by="date")
     
         # Get start and end season date
         start_date, end_date = get_season_dates(seasons.df, season_id=df["season_id"].iloc[0])
-        # Rimuovo features che non mi servono
+        # Remove not needed features
         df = df.drop(columns=["individuali_gruppi","online_offline"])
 
-        # Somma giornaliera dei dati delle vendite
+        # Daily sum of the sales
         df = df.groupby(['date', 'season_id', 'show_id'], as_index=False).sum()
         show_id = df["show_id"].iloc[0]
         
-        # Calcolo la cumulata del guadagno e del numero di biglietti venduti
+        # Calculating cumulative sum of gains and tickets
         df = add_cumulative_sum(df, column_names=["gain", "tickets"])
         df["avg_ticket_price"] = df["gain_cum_sum"]/df["tickets_cum_sum"]
         
@@ -123,6 +133,7 @@ def add_features(seasons: Seasons, products: Products, sales: Sales, fill_to_sho
             # Numero biglietti rimanenti per raggiungere capienza massima
             df["remaining_tickets"] = df["performance_capacity"]-df["tickets_cum_sum"]
             df["percentage_bought"] = df["tickets_cum_sum"]/df["performance_capacity"]
+
             # Aggiungo medie mobili con differenti periodi
             df = add_moving_avarages(df, ["gain_cum_sum", "tickets_cum_sum", "percentage_bought"], [2,4,6,8,10,15,20,30])
             

@@ -5,8 +5,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from dotenv import load_dotenv, find_dotenv
 
-from ..data_ingestion.raw_data import Sales, Products, Seasons
-from ..data_ingestion.feat import add_features
+from ..data_pipeline.ingestion import Sales, Products, Seasons
+from ..data_pipeline.transformation import add_features
 from ..train.utils import keep_enabled_columns, separete_features_targets, train_XGBRegressor, save_model, abs_error
 from ..train.model_preparation import Features, ModelData
 

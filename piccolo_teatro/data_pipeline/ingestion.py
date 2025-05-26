@@ -98,6 +98,9 @@ class Sales():
     def get_same_show(self, show_id):
         self.df = self.df[self.df["show_id"] == show_id]
 
+    def get_groups(self):
+        return self.df.groupby('show_id')
+    
     def clean(self):
         self.assign_types()
         self.clean_rows()
