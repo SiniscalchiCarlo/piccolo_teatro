@@ -11,6 +11,7 @@ dataset = pandas.read_csv('input_df_a6a786ea-4685-45ea-809b-c22118abcfa1.csv')
 
 from piccolo_teatro.data_pipeline import run_data_pipeline
 from piccolo_teatro.trend_simulation import predict_trend
+from piccolo_teatro.models import get_model
 import pandas as pd
 import matplotlib.pyplot as plt
 
@@ -76,8 +77,8 @@ def powerbi_visual(dataset, static = True):
     df = run_data_pipeline(SALES, PRODUCTS, SEASONS, show_id)
 
     known_trend = df["percentage_bought"].copy()
-
-    predicted_trend = predict_trend(df, "xgb")
+    model = get_model("XGB_trend")
+    predicted_trend = predict_trend(df, model)
 
     # Plotting
     plt.plot(predicted_trend)

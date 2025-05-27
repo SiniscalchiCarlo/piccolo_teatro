@@ -1,26 +1,18 @@
 
 import pandas as pd
-import pickle
-import os
-from dotenv import load_dotenv, find_dotenv
 
 from ..train import keep_enabled_columns, separete_features_targets
 from ..config import Features
 
-load_dotenv(find_dotenv())
-path = os.getenv('FOLDER_PATH')
 
-def predict_trend(known_df, model_type):
+def predict_trend(known_df, model):
     '''
     Predicts the sales trend of a show:
     Given known features up to day t, this function predicts the cumulative percentage of sales for day t+1.
     It then updates the features (assuming the prediction is equal to the real value) and proceeds to predict the next day's value.
     This process is repeated iteratively until the full sales trend is generated.
     '''
-    
-    if model_type == "xgb":
-        model = pickle.load(open(path+f"\\models\\XGB_trend.pkl", "rb"))
-        
+
     current_day = known_df["date"].iloc[-1]
 
     df = keep_enabled_columns(known_df.copy())
