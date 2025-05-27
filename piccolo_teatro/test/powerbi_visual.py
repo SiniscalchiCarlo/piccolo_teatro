@@ -77,7 +77,7 @@ def powerbi_visual(dataset, static = True):
     df = run_data_pipeline(SALES, PRODUCTS, SEASONS, show_id)
 
     known_trend = df["percentage_bought"].copy()
-    model = get_model("XGB_trend")
+    model = get_model("XGB_trend2")
     predicted_trend = predict_trend(df, model)
 
     # Plotting
