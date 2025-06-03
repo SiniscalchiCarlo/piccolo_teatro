@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="piccolo_teatro",
-    varsion="0.1.0",
+    varsion="0.1.1",
     description="""Libreria usata dal Piccolo Teatro di Milano per 
                     fare previsioni sull'andamento di acquisto 
                     degli spettacoli""",

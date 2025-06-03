@@ -24,9 +24,10 @@ ids = random.sample(ids, k=len(ids))
 
 print("len ids", len(ids))
 for show_id in ids:
-
+    show_id = 10228587066794
     df = run_data_pipeline(SALES, PRODUCTS, SEASONS, show_id)
-
+    print(df)
+    print("len df", len(df))
     # We are simulationg we don't know all the data
     unknown_trend = df["percentage_bought"].copy()
     known_df = df.head(int(len(df) * offset)).copy()

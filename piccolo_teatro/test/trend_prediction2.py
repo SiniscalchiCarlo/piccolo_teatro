@@ -78,6 +78,7 @@ if __name__ == "__main__":
     ids = random.sample(ids, k=len(ids))
     
     for show_id in ids:
+        show_id = 10228587066794
         # Ingesting and cleaning data
         sales = Sales(SALES)
         products = Products(PRODUCTS)
