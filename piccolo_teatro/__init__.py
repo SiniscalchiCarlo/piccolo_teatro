@@ -75,8 +75,6 @@ def powerbi_visual(dataset, offset, static = True):
 
     known_trend = df["percentage_bought"].copy()
 
-    fig = go.Figure()
-
     model = get_model("XGB_trend2")
     future_prediction = predict_trend(df, model)
 

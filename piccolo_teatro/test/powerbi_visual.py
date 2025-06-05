@@ -99,4 +99,4 @@ def powerbi_visual2(dataset, static = True):
     plt.show()
 
 
-powerbi_visual(dataset, static=False)
+powerbi_visual(dataset, offset=0.3, static=True)
