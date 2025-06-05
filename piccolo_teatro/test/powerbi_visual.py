@@ -2,6 +2,7 @@
 from ..data_pipeline import run_data_pipeline
 from ..trend_simulation import predict_trend
 from ..models import get_model
+from .. import powerbi_visual
 import pandas as pd
 import matplotlib.pyplot as plt
 import os
@@ -12,7 +13,7 @@ dataset = pd.read_csv('input_df_e115a812-5f0a-452a-bc57-676ebe7071ff.csv')
 
 #pd.set_option("display.max_columns", None)
 
-def powerbi_visual(dataset, static = True):
+def powerbi_visual2(dataset, static = True):
 
     sales_cols = [
         "Individuali/Gruppi",
@@ -96,4 +97,6 @@ def powerbi_visual(dataset, static = True):
     plt.plot(known_trend, color="blue")
     plt.plot(future_prediction, color="orange")
     plt.show()
-powerbi_visual(dataset, static=True)
+
+
+powerbi_visual(dataset, static=False)
