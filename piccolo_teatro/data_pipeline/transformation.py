@@ -89,17 +89,18 @@ def add_show_info(products_df, df, show_id):
     else:
         return pd.DataFrame()
         
-def add_features(seasons: Seasons, products: Products, df: pd.DataFrame, fill_to_show_date=True):
+def add_features(seasons: Seasons, products: Products, df: pd.DataFrame, live_data=False):
         '''
         This function is called to enrich the sales dataframe with new features, 
         ensuring it contains all the features that might be needed.
         '''
-
+        
+    
         if df['show_id'].nunique() != 1:
             raise Exception("Error: passed to 'add_features()' sales that are not all from the same show")
         
         df = df.sort_values(by="date")
-    
+
         # Get start and end season date
         start_date, end_date = get_season_dates(seasons.df, season_id=df["season_id"].iloc[0])
         # Remove not needed features
@@ -116,13 +117,13 @@ def add_features(seasons: Seasons, products: Products, df: pd.DataFrame, fill_to
         # Add informations about the performance, and checks the product is one of the one we are interested in 
         df = add_show_info(products.df, df, show_id)  
         if not df.empty:
-            if fill_to_show_date:
-                last_date = df["last_date"].iloc[0]
+            if live_data:
+                fill_date = df["date"].iloc[-1]
             else:
-                last_date = df["date"].iloc[-1]
+                fill_date = df["last_date"].iloc[0]
 
             # Aggiungo i dati dei giorni mancanti (giorni senza vendite), li riempio mettendo l'ultimo valore noto
-            date_range = pd.date_range(start=df["date"].min(), end=last_date)
+            date_range = pd.date_range(start=df["date"].min(), end=fill_date)
             df = df.set_index("date").reindex(date_range, method="ffill")
             df["date"] = df.index
 
@@ -132,22 +133,24 @@ def add_features(seasons: Seasons, products: Products, df: pd.DataFrame, fill_to
             df["end_season_distance"] = (df["date"]-end_date).dt.days.abs()
             df["sales_duration"] = (df["last_date"]-start_date).dt.days
             df["end_sales_distance"] = (df["last_date"]-df["date"]).dt.days
-            df["percentage_sales_day"] = df["start_sales_distance"]/(df["date"].max()-start_date).days
-
+            df["percentage_sales_day"] = df["start_sales_distance"]/(df["last_date"]-start_date).dt.days
+            df["percentage_sales_day"] = df["percentage_sales_day"]
         
         
             # Numero biglietti rimanenti per raggiungere capienza massima
             df["remaining_tickets"] = df["performance_capacity"]-df["tickets_cum_sum"]
             df["percentage_bought"] = df["tickets_cum_sum"]/df["performance_capacity"]
+            df["percentage_bought"] = df["percentage_bought"]
 
             # Aggiungo medie mobili con differenti periodi
             df = add_moving_avarages(df, ["gain_cum_sum", "tickets_cum_sum", "percentage_bought"], [2,4,6,8,10,15,20,30])
-            
+
             # Aggiungo valori shiftati
             df = add_shifted_values(df, ["gain_cum_sum", "tickets_cum_sum", "percentage_bought"], [2,4,6,8,10,15,20,30])
-
+            
             # Aggiungo i possibili target da prevedere:
             df = add_targets(df, targets_dict)
+            
         else:
             df = pd.DataFrame()
         return df

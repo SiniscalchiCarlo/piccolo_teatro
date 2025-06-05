@@ -67,7 +67,7 @@ def create_full_datasets(sales: Sales, products: Products, seasons: Seasons, pat
         group = add_features(seasons=seasons,
                              products=products,
                              df=group,
-                             fill_to_show_date=True)
+                             live_data=False)
         
             
         group.to_parquet(f"{path}/shows/{show_id}.gzip", index=False)

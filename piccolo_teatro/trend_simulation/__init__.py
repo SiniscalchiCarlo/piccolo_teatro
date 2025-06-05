@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 from ..train import keep_enabled_columns, separete_features_targets
 from ..config import Features
 
+pd.set_option("display.max_columns", None)
 
 def predict_trend(known_df, model):
     '''
@@ -23,7 +24,8 @@ def predict_trend(known_df, model):
     predicitons_days = []
     
     # Keep iterating until we predict the last day (day of the last performance of the show)
-    n_predictions = df["sales_duration"].iloc[0]-len(known_df)    
+    n_predictions = df["sales_duration"].iloc[0]-len(known_df)   
+
     for i in range(n_predictions):
         current_day += pd.Timedelta(days=1)
         

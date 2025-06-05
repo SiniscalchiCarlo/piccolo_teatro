@@ -6,13 +6,14 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import os
 
-os.chdir(u'C:/Users/39370/PythonEditorWrapper_2bb9f65f-f4ae-43d4-a20d-b947cf6e1c96')
-dataset = pd.read_csv('input_df_e115a812-5f0a-452a-bc57-676ebe7071ff.csv')
 
 
 #pd.set_option("display.max_columns", None)
 
-def powerbi_visual(dataset, static = True):
+def powerbi_visual(dataset, n):
+    #c = dataset["REFERENCE_DATE"].copy()
+    #c = c.sort_values()
+    #print(c.tail(1))
 
     sales_cols = [
         "Individuali/Gruppi",
@@ -77,23 +78,39 @@ def powerbi_visual(dataset, static = True):
 
     sales_duration = df["sales_duration"].iloc[0]
 
-    pd.set_option("display.max_columns", None)
-
-    offset = 0.3
+    offset = 0.1
     known_trend = df["percentage_bought"].copy()
 
+
     model = get_model("XGB_trend2")
-    future_prediction = predict_trend(df, model)
-    
-    if int(sales_duration * offset)<= len(df):
-        fixed_df = df.head(int(sales_duration * offset)).copy()
-        predicted_fixed_trend = predict_trend(fixed_df, model)
-        plt.plot(predicted_fixed_trend, color="green")
+    #future_prediction = predict_trend(df, model, fixed=False)
 
 
-    # Plotting
-    
-    plt.plot(known_trend, color="blue")
-    plt.plot(future_prediction, color="orange")
-    plt.show()
-powerbi_visual(dataset, static=True)
+    fixed_df = df.head(len(df)-1).copy()
+    fixed_df = df.loc[:'2024-11-20'].copy()
+
+    print(len(fixed_df))
+    fixed_df.to_csv(rf"C:\Users\39370\Downloads\dati_piccolo_teatro2\debugging\fixed_{n}.csv")
+
+    predicted_fixed_trend = predict_trend(fixed_df, model, fixed=True)
+
+    return known_trend, predicted_fixed_trend, fixed_df
+
+os.chdir(u'C:/Users/39370/PythonEditorWrapper_2bb9f65f-f4ae-43d4-a20d-b947cf6e1c96')
+dataset = pd.read_csv('input_df_e115a812-5f0a-452a-bc57-676ebe7071ff.csv')
+
+known_trend1, predicted_fixed_trend1, fixed_df1 = powerbi_visual(dataset, 1)
+print("\n====\n")
+
+os.chdir(u'C:/Users/39370/PythonEditorWrapper_273aa73c-8b39-4e1e-bd08-69d1bc175c4d')
+dataset = pd.read_csv('input_df_4f4b286c-7f79-46e6-8fbd-d3f81b703b41.csv')
+known_trend2, predicted_fixed_trend2, fixed_df2 = powerbi_visual(dataset, 2)
+
+print(fixed_df1.equals(fixed_df1))
+plt.plot(known_trend1, color="blue")
+plt.plot(known_trend2, color="purple")
+
+plt.plot(predicted_fixed_trend1, color="red")
+plt.plot(predicted_fixed_trend2, color="green")
+plt.show()
+

@@ -13,7 +13,7 @@ load_dotenv(find_dotenv())
 path = os.environ.get("FOLDER_PATH")
 model = pickle.load(open(r"C:\Users\39370\Desktop\piccolo_teatro\piccolo_teatro\models\XGB_trend2.pkl", "rb"))
 
-offset = 0.4
+offset = 0.1
 SALES = pd.read_csv(path+"\\D_SALES_LIST_SALES.csv", index_col=False)
 PRODUCTS = pd.read_csv(path+"\\D_CONFIG_PROD_LIST.csv", index_col=False)
 SEASONS = pd.read_csv(path+"\\stagioni.csv", index_col=False)
@@ -25,7 +25,7 @@ ids = random.sample(ids, k=len(ids))
 
 print("len ids", len(ids))
 for show_id in ids:
-    show_id = 10228544662578
+    show_id = 10228587066800
     df = run_data_pipeline(SALES, PRODUCTS, SEASONS, show_id)
     print(df)
     print("len df", len(df))

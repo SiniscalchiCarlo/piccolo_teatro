@@ -17,10 +17,11 @@ def run_data_pipeline(SALES, PRODUCTS, SEASONS, show_id=None):
     sales, products, seasons = clean_data(SALES, PRODUCTS, SEASONS)
     if show_id is not None:
         sales.get_same_show(show_id)
-
+    
     df = add_features(seasons=seasons,
                     products=products,
                     df=sales.df,
-                    fill_to_show_date=False)
+                    live_data=True)
+    
     
     return df
