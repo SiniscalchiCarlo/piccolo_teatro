@@ -6,6 +6,8 @@ from ..config import FeatEngConf
 from .utils import one_hot_encode, add_cumulative_sum, add_moving_avarages, add_shifted_values, add_targets
 from .ingestion import Sales, Products, Seasons
 import logging
+import time
+
 logger = logging.getLogger(__name__)
 
 load_dotenv(find_dotenv())
@@ -25,7 +27,11 @@ def add_show_info(products_df, df, show_id):
     '''
     This functions enriches the dataframe by adding informations about shows (hour, number of tickes...)
     '''
+    show_id=int(show_id)
     performances_same_show = products_df[products_df["show_id"]==show_id]
+
+
+
     performance_state = performances_same_show["performance_state"].iloc[0]
     performance_type = performances_same_show["show_type"].iloc[0]
     preformance_season = performances_same_show["season_name"].iloc[0]
@@ -124,8 +130,8 @@ def add_features(seasons: Seasons, products: Products, df: pd.DataFrame, fill_to
             # Distanza della transazione dall'inizio e dalla fine della stagione
             df["start_sales_distance"] = (df["date"]-start_date).dt.days.abs()
             df["end_season_distance"] = (df["date"]-end_date).dt.days.abs()
-            df["sales_duration"] = (df["date"].max()-start_date).days
-            df["end_sales_distance"] = (df["date"].max()-df["date"]).dt.days
+            df["sales_duration"] = (df["last_date"]-start_date).dt.days
+            df["end_sales_distance"] = (df["last_date"]-df["date"]).dt.days
             df["percentage_sales_day"] = df["start_sales_distance"]/(df["date"].max()-start_date).days
 
         

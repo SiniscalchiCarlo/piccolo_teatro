@@ -8,6 +8,7 @@ from dotenv import load_dotenv, find_dotenv
 from ..data_pipeline import run_data_pipeline
 from . import predict_trend
 
+pd.set_option("display.max_columns", None)
 load_dotenv(find_dotenv())
 path = os.environ.get("FOLDER_PATH")
 model = pickle.load(open(r"C:\Users\39370\Desktop\piccolo_teatro\piccolo_teatro\models\XGB_trend2.pkl", "rb"))
@@ -24,7 +25,7 @@ ids = random.sample(ids, k=len(ids))
 
 print("len ids", len(ids))
 for show_id in ids:
-    show_id = 10228587066794
+    show_id = 10228544662578
     df = run_data_pipeline(SALES, PRODUCTS, SEASONS, show_id)
     print(df)
     print("len df", len(df))
@@ -36,5 +37,6 @@ for show_id in ids:
 
     # Plotting
     plt.plot(predicted_trend)
+    plt.show()
     plt.plot(unknown_trend)
     plt.show()

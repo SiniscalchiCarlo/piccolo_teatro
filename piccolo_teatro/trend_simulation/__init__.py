@@ -1,5 +1,6 @@
 
 import pandas as pd
+import matplotlib.pyplot as plt
 
 from ..train import keep_enabled_columns, separete_features_targets
 from ..config import Features
@@ -21,13 +22,16 @@ def predict_trend(known_df, model):
     predictions = []
     predicitons_days = []
     
-    input_row = features.df.iloc[[-1]]
     # Keep iterating until we predict the last day (day of the last performance of the show)
-    while(input_row["sales_duration"].iloc[0]-input_row["start_sales_distance"].iloc[0]>0):        
+    n_predictions = df["sales_duration"].iloc[0]-len(known_df)    
+    for i in range(n_predictions):
         current_day += pd.Timedelta(days=1)
         
         input_row = features.df.iloc[[-1]]
         prediction = model.predict(input_row)[0]
+        
+        # Prediciton need to be always highes than the last percentage 
+        prediction = max(prediction, input_row.iloc[0]["percentage_bought"])
 
         predictions.append(prediction)
         predicitons_days.append(current_day)

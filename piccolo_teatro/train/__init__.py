@@ -1,8 +1,5 @@
-import os
-import pickle
 import pandas as pd
-from dotenv import load_dotenv, find_dotenv
-from xgboost import XGBRegressor
+import matplotlib.pyplot as plt
 from sklearn.metrics import mean_absolute_error
 
 from ..config import TrainConfig, Features, TrainConfig
@@ -56,4 +53,6 @@ def keep_enabled_columns(df):
 def abs_error(model, X, Y):
         train_prediciton = model.predict(X)
         train_mae = mean_absolute_error(Y, train_prediciton)
+        plt.plot(Y-X["percentage_bought"], "ro")
+        plt.show()
         print(f"Mean Absolute Error: {train_mae}")

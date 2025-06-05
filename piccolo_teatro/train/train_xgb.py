@@ -18,7 +18,7 @@ train_df = keep_enabled_columns(train_df)
 test_df = keep_enabled_columns(test_df)
 
 train_X, train_Y = separete_features_targets(train_df, sort=False, shuffle=True)
-valdiation_X, valdiation_Y = separete_features_targets(test_df, sort=False, shuffle=True)
+validation_X, valdiation_Y = separete_features_targets(test_df, sort=False, shuffle=True)
 
 # Training
 model = XGBRegressor(n_estimators=200, 
@@ -27,7 +27,7 @@ model = XGBRegressor(n_estimators=200,
 model.fit(train_X, train_Y)
 
 # Calculating error
-abs_error(model, valdiation_X, valdiation_Y)
+abs_error(model, validation_X, valdiation_Y)
 
 # Saving model
 model_path = os.path.join(os.path.dirname(__file__), "..", "models", "XGB_trend2.pkl")

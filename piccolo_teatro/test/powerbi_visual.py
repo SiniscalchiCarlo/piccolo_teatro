@@ -1,19 +1,14 @@
-# Prolog - Auto Generated #
-import os, uuid, matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot
-import pandas
 
-import sys
-
-os.chdir(u'C:/Users/39370/PythonEditorWrapper_9926174e-931f-4b65-98a3-b8328749f53d')
-dataset = pandas.read_csv('input_df_a6a786ea-4685-45ea-809b-c22118abcfa1.csv')
-
-from piccolo_teatro.data_pipeline import run_data_pipeline
-from piccolo_teatro.trend_simulation import predict_trend
-from piccolo_teatro.models import get_model
+from ..data_pipeline import run_data_pipeline
+from ..trend_simulation import predict_trend
+from ..models import get_model
 import pandas as pd
 import matplotlib.pyplot as plt
+import os
+
+os.chdir(u'C:/Users/39370/PythonEditorWrapper_2a275f8c-6f3b-41a1-9705-e56f049afd52')
+dataset = pd.read_csv('input_df_dfef7f47-ff57-43e2-9c99-e4f7d02c59c6.csv')
+pd.set_option("display.max_columns", None)
 
 def powerbi_visual(dataset, static = True):
 
@@ -54,11 +49,13 @@ def powerbi_visual(dataset, static = True):
     SALES.columns = ["D_SALES_LIST_SALES_"+col for col in SALES.columns]
    
     PRODUCTS = dataset[performances_cols].copy()
+    PRODUCTS = PRODUCTS.drop_duplicates()
     PRODUCTS = PRODUCTS.rename(columns={'Tipologia spettacolo': 'Tipologia_spettacolo'})
 
     PRODUCTS.columns = ["D_CONFIG_PROD_LIST_"+col for col in PRODUCTS.columns]
 
     SEASONS = dataset[seasons_cols].copy()
+    SEASONS = SEASONS.drop_duplicates()
     SEASONS = SEASONS.rename(columns={
         "FINE STAGIONE": "fine_stagione",
         "FINE VENDITE": "fine_vendite",
@@ -76,13 +73,27 @@ def powerbi_visual(dataset, static = True):
     
     df = run_data_pipeline(SALES, PRODUCTS, SEASONS, show_id)
 
+    sales_duration = df["sales_duration"].iloc[0]
+
+    pd.set_option("display.max_columns", None)
+
+    offset = 0.2
     known_trend = df["percentage_bought"].copy()
+    plt.plot(known_trend, color="blue")
+
     model = get_model("XGB_trend2")
-    predicted_trend = predict_trend(df, model)
+    future_prediction = predict_trend(df, model)
+    
+    fixed_df = df.head(int(sales_duration * offset)).copy()
+    predicted_fixed_trend = predict_trend(fixed_df, model)
+
 
     # Plotting
-    plt.plot(predicted_trend)
-    plt.plot(known_trend)
+    
+    plt.plot(predicted_fixed_trend, color="green")
+    plt.plot(future_prediction, color="orange")
     plt.show()
-
 powerbi_visual(dataset, static=True)
+
+# Epilog - Auto Generated #
+os.chdir(u'C:/Users/39370/PythonEditorWrapper_f249a650-ee7d-4197-9dc6-174f70f201a6')
