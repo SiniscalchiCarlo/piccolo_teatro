@@ -7,8 +7,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import os
 
-os.chdir(u'C:/Users/39370/PythonEditorWrapper_2bb9f65f-f4ae-43d4-a20d-b947cf6e1c96')
-dataset = pd.read_csv('input_df_e115a812-5f0a-452a-bc57-676ebe7071ff.csv')
+os.chdir(u'C:/Users/39370/PythonEditorWrapper_78ed6a64-40c3-4913-965b-39836b7c423d')
+dataset = pd.read_csv('input_df_428cf95d-4dfd-4ec7-b984-120122c330c1.csv')
 
 
 #pd.set_option("display.max_columns", None)
@@ -99,4 +99,4 @@ def powerbi_visual2(dataset, static = True):
     plt.show()
 
 
-powerbi_visual(dataset, offset=0.3, static=True)
+powerbi_visual(dataset, offset=0.1, static=True, gain_trend=False)
