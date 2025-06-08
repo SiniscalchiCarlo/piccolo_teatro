@@ -77,7 +77,7 @@ def plot_trends(static, product_name, known_gain, known_trend, future_prediction
             style.use('seaborn-v0_8-pastel')
             plt.plot(predicted_fixed_trend*scale_factor, color="green", label="Fixed Trend Prediction")
 
-        plt.title(f"Trend Prediction for {product_name}", fontsize=14)
+        plt.title(f'Trend Prediction for "{product_name}"', fontsize=14)
         plt.xlabel("Time", fontsize=12)
         plt.ylabel('Show gain', fontsize=12)
         plt.legend()
@@ -95,7 +95,7 @@ def plot_trends(static, product_name, known_gain, known_trend, future_prediction
             fig.add_trace(go.Scatter(x=predicted_fixed_trend.index, y=predicted_fixed_trend*scale_factor, mode='lines', name='Fixed Trend Prediction', line=dict(width=4)))
         
         fig.update_layout(
-            title=f"Trend Prediction for {product_name}",
+            title=f'Trend Prediction for "{product_name}"',
             title_font=dict(size=28),
             xaxis_title='Date',
             xaxis_title_font=dict(size=24),
