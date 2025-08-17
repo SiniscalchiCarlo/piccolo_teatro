@@ -28,12 +28,45 @@ def add_shifted_values(df, column_names: list[str], periods: list[int]) -> dict:
 
 
 class TrainConfig(BaseModel):
+    """Configuration container used throughout the training pipeline.
+
+    It stores both modelling parameters and feature engineering
+    information so that every component of the project can access the
+    same configuration instance.  The default values are sensible
+    starting points but can easily be overridden by instantiating the
+    class with different arguments.
+    """
+
+    # --- Feature engineering configuration ---
     periods: List[int] = [2, 4, 6, 8, 10, 15, 20, 30]
+
+    # --- Modelling configuration ---
     target: str = "percentage_bought"
-    model: str ="xgb"
-    parameters: dict ={"n_estimators":200, 
-                       "learning_rate":0.1, 
-                       "objective":"reg:squarederror"}
+    model: str = "xgb"
+
+    # Default parameters used to initialise the model before tuning.
+    parameters: dict = {
+        "n_estimators": 200,
+        "learning_rate": 0.1,
+        "objective": "reg:squarederror",
+    }
+
+    # Grid of parameters explored during hyper‑parameter optimisation.
+    # The ranges are purposely wide to allow the search procedure to
+    # discover well performing combinations.  Only the parameters
+    # relevant for the XGBoost model are included.
+    param_grid: Dict[str, List] = {
+        "n_estimators": [100, 200, 400],
+        "max_depth": [3, 5, 7],
+        "learning_rate": [0.01, 0.05, 0.1],
+        "subsample": [0.8, 1.0],
+        "colsample_bytree": [0.8, 1.0],
+    }
+
+    # Number of splits used by the time series cross validation.
+    cv_splits: int = 5
+
+    # Name of the file where the trained model will be stored.
     file_name: str = "xgb_trend"
 
 class FeatEngConf(BaseModel):
