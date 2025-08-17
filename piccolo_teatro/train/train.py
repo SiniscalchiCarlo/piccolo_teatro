@@ -5,10 +5,11 @@ from dotenv import load_dotenv, find_dotenv
 from piccolo_teatro.config import TrainConfig, config_recap
 from piccolo_teatro.train.train_xgb import train_xgb
 from piccolo_teatro.train.utils import df_report
+from piccolo_teatro.trend_simulation import predict_trend
 from xgboost import XGBRegressor
 from . import keep_enabled_columns, separete_features_targets, abs_error
 
-pd.set_option('display.max_columns', None)
+# 1) LOADING DATA
 load_dotenv(find_dotenv())
 path = os.getenv('FOLDER_PATH')
 
@@ -24,13 +25,18 @@ train_X, train_Y = separete_features_targets(train_df, sort=False, shuffle=True)
 validation_X, valdiation_Y = separete_features_targets(test_df, sort=False, shuffle=True)
 # Printing dataset report 
 df_report(train_df)
+
+
+# 2) TRAINING THE MODEL
 # Printing Training Configurations
 config_recap()
 train_conf = TrainConfig()
 
+model = None
 if train_conf.model == "xgb":
-    model = train_xgb()
+    model = train_xgb(train_X, train_Y)
 
-model_path = os.path.join(os.path.dirname(__file__), "..", "models", f"${train_conf.file_name}.pkl")
-pickle.dump(model, open(model_path, "wb"))
+if model != None:
+    model_path = os.path.join(os.path.dirname(__file__), "..", "models", f"${train_conf.file_name}.pkl")
+    pickle.dump(model, open(model_path, "wb"))
 
