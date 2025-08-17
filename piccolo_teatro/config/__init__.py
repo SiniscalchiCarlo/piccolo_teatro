@@ -29,22 +29,18 @@ def add_shifted_values(df, column_names: list[str], periods: list[int]) -> dict:
 
 class TrainConfig(BaseModel):
     periods: List[int] = [2, 4, 6, 8, 10, 15, 20, 30]
-    prediction_period: int = 1
     target: str = "percentage_bought"
+    model: str ="xgb"
+    parameters: dict ={"n_estimators":200, 
+                       "learning_rate":0.1, 
+                       "objective":"reg:squarederror"}
+    file_name: str = "xgb_trend"
 
 class FeatEngConf(BaseModel):
     encoding_dict: Dict[str, List[str]] = {
-        "performance_type": ['Internazionale', 'Ospitalità', 'Collaborazione', 'Produzione', 'Festival'],
+        "show_type": ['Internazionale', 'Ospitalità', 'Collaborazione', 'Produzione', 'Festival'],
     #    "performance_day": ["lun", "mar", "mer", "gio", "ven", "sab", "dom"],
     }
-
-    targets_dict: Dict[str, List[int]] = {
-        "gain_cum_sum": [1],
-        "tickets_cum_sum": [1],
-        "gain": [1],
-        "tickets": [1],
-        "percentage_bought": [1]
-        }
 
 class Feature(BaseModel):
     columns: List[str]
@@ -60,35 +56,36 @@ class Features:
         self.new_predicition = None
 
         # Initialization of constant features
-        self.performance_type: Feature = Feature(columns=self.feat_eng_conf.encoding_dict["performance_type"],
-                                                        const=True,
-                                                        enabled=False,
-                                                        update=self.__update_const)
-        
         #self.performance_day: Feature = Feature(columns=self.feat_eng_conf.encoding_dict["performance_day"],
         #                                            const=True,
         #                                            enabled=False,
         #                                            update=self.__update_const)
-        
-        self.performance_capacity: Feature = Feature(columns=["performance_capacity"],
-                                                            const=True,
-                                                            enabled=False,
-                                                            update=self.__update_const)
-        
         #self.performance_hour: Feature = Feature(columns=["performance_hour"],
         #                                                    const=True,
         #                                                    enabled=False,
         #                                                    update=self.__update_const)
+        #self.performance_number: Feature = Feature(columns=["performance_number"],
+        #                                                    const=True,
+        #                                                    enabled=False,
+        #                                                    update=self.__update_const)
+
+        self.show_type: Feature = Feature(columns=self.feat_eng_conf.encoding_dict["show_type"],
+                                                        const=True,
+                                                        enabled=False,
+                                                        update=self.__update_const)
+        
+        
+        self.show_capacity: Feature = Feature(columns=["show_capacity"],
+                                                            const=True,
+                                                            enabled=False,
+                                                            update=self.__update_const)
+        
         
         self.num_performances: Feature = Feature(columns=["num_performances"],
                                                             const=True,
                                                             enabled=False,
                                                             update=self.__update_const)
         
-        #self.performance_number: Feature = Feature(columns=["performance_number"],
-        #                                                    const=True,
-        #                                                    enabled=False,
-        #                                                    update=self.__update_const)
         
         self.sales_duration: Feature = Feature(columns=["sales_duration"],
                                                             const=True,
@@ -110,6 +107,7 @@ class Features:
         self.end_season_distance: Feature = Feature(columns=["end_season_distance"],
                                                             const=False,
                                                             enabled=False)
+
         self.percentage_sales_day: Feature = Feature(columns=["percentage_sales_day"],
                                                      const=False,
                                                      enabled=True,
@@ -133,14 +131,13 @@ class Features:
                                                 update=self.__update_percentage_bought)
         
         # Calling functions that generate multiple features (es. moving avg of multiple periods)
-        self.__get_percentage_bought_avg(enabled=True),
+        self.__get_percentage_bought_avg(enabled=True)
+        
         self.__get_percentage_bought_shifted(enabled=True)
 
         self.__get_features()
-
         
     def update_features(self, prediction):
-
         if self.df is None:
             raise Exception("Please add a input df to Feature class before calling update_features")
         self.new_predicition = prediction
@@ -175,12 +172,12 @@ class Features:
 
     def __create_period_names(self, col_name: str) -> List[str]:
         return [col_name+"_"+str(period) for period in self.train_config.periods]
-        columns = self.__create_period_names("tickets_shifted")
-        self.tickets_shifted = Feature(columns=columns,
-                                    const=False,
-                                    enabled=enabled)
+        # columns = self.__create_period_names("tickets_shifted")
+        # self.tickets_shifted = Feature(columns=columns,
+         #                            const=False,
+         #                            enabled=enabled)
       
-    def __get_percentage_bought_avg(self, enabled) -> List[str]:
+    def __get_percentage_bought_avg(self, enabled):
         columns = self.__create_period_names("percentage_bought_avg")
         self.percentage_bought_avg = Feature(columns=columns,
                                     const=False,
@@ -188,7 +185,7 @@ class Features:
                                     update=self.__update_percentage_bought_avg
                                     )
         
-    def __get_percentage_bought_shifted(self, enabled) -> List[str]:
+    def __get_percentage_bought_shifted(self, enabled):
         columns = self.__create_period_names("percentage_bought_shifted")
         self.percentage_bought_shifted = Feature(columns=columns,
                                     const=False,
@@ -225,4 +222,32 @@ class Features:
         increased_day = int(last_row["start_sales_distance"].iloc[0]) + 1
         new_value = increased_day/self.df["sales_duration"].iloc[0]
         self.new_row["percentage_sales_day"] = [new_value]
-        
+       
+
+def config_recap():
+    train_conf = TrainConfig()
+    features = Features()
+    const_feat = features.const_features
+    variable_feat = features.variable_features
+
+    print("Training Config\n")
+    print("Target:", train_conf.target)
+    print("Constant Features:")
+    for feat in const_feat:
+        if len(feat.columns)==1:
+            print(f" ${feat.columns[0]}")
+        else:
+            print(f" ${feat.columns[0]}, ... , ${feat.columns[-1]}")
+
+
+    print("Variable Features:")
+    for feat in variable_feat:
+        if len(feat.columns)==1:
+            print(f" ${feat.columns[0]}")
+        else:
+            print(f" ${feat.columns[0]}, ... , ${feat.columns[-1]}")
+
+ 
+    print("MA e Lag periods:", train_conf.periods)
+    print("")
+

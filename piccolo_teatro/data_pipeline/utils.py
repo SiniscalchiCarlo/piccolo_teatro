@@ -1,4 +1,5 @@
 import pandas as pd
+from piccolo_teatro.config import TrainConfig
 
 def one_hot_encode(df, encoding_dict):
     for col_name in encoding_dict:
@@ -32,12 +33,9 @@ def print_unique_values(df):
     for col_name in df.columns:
         print(f"{col_name}: {df[col_name].unique()[:10]}")
 
-def add_targets(df, targets_dict):
-    all_periods = []
-    for col_name in targets_dict:
-        periods = targets_dict[col_name]
-        all_periods += periods
-        for period in periods:
-            df[f"TARGET_{col_name}_{period}"] = df[col_name].shift(-period)
-    df = df.iloc[:-max(all_periods)]
+def add_targets(df):
+    train_conf = TrainConfig()
+    col_name = train_conf.target
+    df[f"TARGET_{col_name}"] = df[col_name].shift(-1)
+    df = df.iloc[:-1]
     return df

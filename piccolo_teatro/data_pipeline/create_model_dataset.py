@@ -16,7 +16,6 @@ path = os.environ.get("FOLDER_PATH")
 
 feat_eng_conf = FeatEngConf()
 encoding_dict = feat_eng_conf.encoding_dict
-targets_dict = feat_eng_conf.targets_dict
 
 pd.set_option("display.max_columns", None)
 load_dotenv(find_dotenv())
@@ -88,11 +87,20 @@ def create_full_datasets(sales: Sales, products: Products, seasons: Seasons, pat
 
 # Loading data
 path = os.environ.get("FOLDER_PATH")
-SALES = pd.read_csv(path+"\\D_SALES_LIST_SALES.csv", index_col=False)
-PRODUCTS = pd.read_csv(path+"\\D_CONFIG_PROD_LIST.csv", index_col=False)
-SEASONS = pd.read_csv(path+"\\stagioni.csv", index_col=False)
+SALES = pd.read_csv(path+"/D_SALES_LIST_SALES.csv", index_col=False)
+PRODUCTS = pd.read_csv(path+"/D_CONFIG_PROD_LIST.csv", index_col=False)
+SEASONS = pd.read_csv(path+"/stagioni.csv", index_col=False)
 
 sales, products, seasons = clean_data(SALES, PRODUCTS, SEASONS)
+print("Sales Df:")
+print(f"Shape: {sales.df.shape[0]} rows × {sales.df.shape[1]} cols")
+print(sales.df.dtypes)
+print("Products Df:")
+print(f"Shape: {products.df.shape[0]} rows × {products.df.shape[1]} cols")
+print(products.df.dtypes)
+print("Seasons Df:")
+print(f"Shape: {seasons.df.shape[0]} rows × {seasons.df.shape[1]} cols")
+print(seasons.df.dtypes)
 TRAIN, VALIDATION, TEST = create_full_datasets(sales, products, seasons, path, save_csv=True)
 save_splits(TRAIN, VALIDATION, TEST, path)
 

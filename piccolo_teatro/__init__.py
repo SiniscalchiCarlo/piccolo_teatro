@@ -134,7 +134,7 @@ def powerbi_visual(dataset, offset, static = True, gain_trend = False):
     sales_duration = df["sales_duration"].iloc[0]
     known_trend = df["percentage_bought"].copy()
     known_gain = df["gain_cum_sum"].copy()
-    capacity = df["performance_capacity"].iloc[0]
+    capacity = df["show_capacity"].iloc[0]
 
     scale_factor = 1
     if gain_trend:

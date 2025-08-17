@@ -1,0 +1,339 @@
+\documentclass[a4paper,12pt]{report}  % o book/article a seconda delle tue necessità
+
+% Encoding and language
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[english]{babel}
+
+% Math
+\usepackage{amsmath, amssymb}
+\usepackage{minted}
+\usepackage{minted}
+
+
+% Graphics and figures
+\usepackage{graphicx}
+\usepackage{float}
+
+% Links
+\usepackage[colorlinks=true, linkcolor=blue, urlcolor=blue]{hyperref}
+
+% Margins
+\usepackage[margin=1in]{geometry}
+
+
+\title{\textbf{Implementation of Trend Sales Prediction} \\[1ex]
+Bachelor's Thesis in Mathematical Engineering}
+\author{Carlo Siniscalchi}
+\date{August 2025}
+
+\begin{document}
+
+% --- Title page su pagina singola, senza numeri ---
+\begin{titlepage}
+  \maketitle
+  \thispagestyle{empty}      % rimuove header/footer (numero pag.)
+\end{titlepage}
+
+% --- Table of Contents su pagina singola, senza numeri ---
+\clearpage
+\tableofcontents
+\thispagestyle{empty}        % rimuove numerazione anche qui
+
+% se vuoi un'ulteriore pagina vuota prima degli abstract:
+\clearpage
+
+% --- Abstract in inglese ---
+\section*{Abstract}
+\addcontentsline{toc}{section}{Abstract}
+% testo dell'abstract...
+\clearpage
+
+% --- Abstract in italiano ---
+\section*{Abstract in lingua italiana}
+\addcontentsline{toc}{section}{Abstract in lingua italiana}
+% testo dell'abstract...
+\clearpage
+
+
+\section{Introduction}
+\subsection{The requested result}
+  The prose theater "Piccolo Teatro" had the need to integrate a forecasting model into a Power BI dashboard to analyze show ticket purchase trends.
+  In particular as a final result they wanted a plot showing 2 trend lines, 
+  the first calculated using only the data of the the first N days after the sales of the show are opened.
+  Also this line is constrained to have the finale point as their sales target but by preserving the original shape.
+  The second line instead will be calculated using all the data known.
+
+\subsection{Purpose}
+  This project was requested by the marketing team of the theater, their idea is to compare the two trend lines to decide 
+  if they need to invest or not in marketing to reach their sales goal.
+  The constrained line would represent their target, and because the shape is preserved they can decide based if they have to invest 
+  accordingly to the fact the the real prediction is under or over the target line.
+
+\section{Data Pipeline}
+  First of all it is possible to find all the project code in this \href{https://github.com/SiniscalchiCarlo/piccolo_teatro/tree/features/refactoring}{GitHub repository}
+  All the code I will talk about in this section is inside \verb|/piccolo_teatro/data_pipeline|
+  \subsection{Data Presentation}
+    \begin{description}
+      \item[\texttt{D\_CONFIG\_PROD\_LIST:}] 
+        This table contains information about the theater shows.
+      \item[\texttt{D\_SALES\_LIST\_SALES:}] 
+        This table contains information about each transaction at the theater.
+      \item[\texttt{stagioni:}] 
+        This table contains the start and end dates of the theater seasons. This data is particularly relevant because the opening of ticket sales for theater shows coincides with the beginning of the season, while the end of sales corresponds to the day of the performance.
+    \end{description}
+
+  \subsection{Data Ingestion}
+      In the \verb|/data_ingestion.py| file I defined 3 classes (Sales, Products, Seasons) one for each table, this way it's easier to manage and clean data.
+      Indeed each class takes as input a Pandas Dataframe and has specific methods to mandage the Dataframe. 
+      For Example inside the Sales class we have the following methods:
+      \begin{itemize}
+        \item \textbf{rename\_cols}: Renames columns to easily usable names, removing any leading spaces.
+        \item \textbf{assign\_types}: Standardizes the decimal separator in the \texttt{gain} column (sometimes “,”, other times “.”), drops rows with missing values, and converts data types (float, int, datetime, str).
+        \item \textbf{clean\_cols}: Reduces the DataFrame to only the columns necessary for analysis.
+        \item \textbf{clean\_rows}: Removes unwanted seasons and filters to only ticket‐sale transactions (e.g., excludes subscription purchases).
+        \item \textbf{assign\_index}: Sets the \texttt{date} column as the DataFrame index.
+        \item \textbf{sort\_values}: Sorts the DataFrame chronologically by \texttt{date}.
+        \item \textbf{get\_head(\emph{offset})}: Keeps only the initial fraction of rows defined by \emph{offset}, simulating the first N days of sales.
+        \item \textbf{get\_same\_show(\emph{show\_id})}: Filters the DataFrame for a specific show.
+        \item \textbf{get\_groups}: Returns a \texttt{GroupBy} object grouped by \texttt{show\_id} for aggregate analysis.
+        \item \textbf{clean}: Runs \texttt{assign\_types}, \texttt{clean\_rows}, and \texttt{clean\_cols} in sequence for a full cleaning pipeline.
+      \end{itemize}
+
+  Dataframes after ingestion:
+    \begin{itemize}
+      \item \textbf{Sales DF:}
+      \item \textbf{Shows DF:}
+      \item \textbf{Seasons DF:}
+    \end{itemize}
+
+```latex
+\section{Features and Targets}
+  \subsection{Approach}
+    Since feature calculation can be time-consuming and the final set of features and targets is not known in advance, we compute all potentially useful features from the raw data once and then use a configuration file to select the subset to feed into the model. We start with three separate cleaned tables that are not yet related: one containing show information (\eg, type, number of performances), another containing transaction records, and a third listing seasons. Our goal is to merge these into a single table where each row represents a show on a specific day, enriched with both historical transaction metrics and static show metadata for model training.
+
+  \subsection{Calculate Features and Targets}
+    The code for this section can be found in
+    \verb|/piccolo_teatro/data_pipeline/transformation.py|.
+
+    First, we group the sales data by \texttt{show\_id}, \texttt{season}, and \texttt{day}, summing all transactions for each show on each day of a season. For instance, each entry in the \texttt{gain} column represents the total revenue generated by a show on that specific day. From this aggregated data, we compute the following features:
+
+    \begin{itemize}
+      \item \textbf{Sales Metrics and Targets:}\\
+        Features marked with * can serve as prediction targets when calculated one day after the data point.
+        \begin{itemize}
+          \item \textbf{*gain\_cum\_sum}: cumulative daily revenue.
+          \item \textbf{*tickets\_cum\_sum}: cumulative daily ticket sales.
+          \item \textbf{\{colName\}\_mvg\_avg\_\{period\}}: rolling-window moving averages over \{period\} days (periods: 2, 4, 6, 8, 10, 15, 20, 30) of \texttt{gain\_cum\_sum}, \texttt{tickets\_cum\_sum}, and \texttt{percentage\_bought}.  \\
+            \emph{Justification:} captures short-term versus medium-term momentum in ticket sales (e.g., whether demand is accelerating or decelerating). By smoothing out day-to-day noise, it helps models learn the underlying trend rather than spurious fluctuations.
+          \item \textbf{\{colName\}\_shifted\_\{period\}}: lagged values over \{period\} days of \texttt{gain\_cum\_sum}, \texttt{tickets\_cum\_sum}, and \texttt{percentage\_bought} (e.g., the value of \texttt{gain\_cum\_sum} six days prior).  \\
+            \emph{Justification:} quantifies autocorrelation in sales: today's sales often depend on what happened 1, 3, or 7 days ago (weekend effects, promotional spikes). Including multiple lags lets the model learn optimal weights for each horizon.
+          \item \textbf{remaining\_tickets}: tickets still available.  \\
+            \emph{Justification:} provides a "remaining capacity" signal. As tickets sell out, scarcity can drive a last-minute rush—critical to capture for near-sell-out shows.
+          \item \textbf{*percentage\_bought}: proportion of tickets sold to date relative to the total available.  \\
+            \emph{Justification:} normalizes cumulative sales, helping the model compare shows of different sizes and highlighting stages of sell-through.
+        \end{itemize}
+
+      \item \textbf{Show Metadata:}\\
+        Static information about each show.
+        \begin{itemize}
+          \item \textbf{show\_type}: e.g., children’s show, cultural collaboration.  \\
+            \emph{Justification:} different genres have distinct sales patterns (a children’s show may have steadier sales; famous shows often see rapid early sell-through).
+          \item \textbf{show\_capacity}: total tickets available across all performances.  \\
+            \emph{Justification:} overall scale influences pace of sales and potential for scarcity effects.
+          \item \textbf{num\_performances}: total number of performances for the show.  \\
+            \emph{Justification:} more performances spread out demand, often smoothing daily sales curves compared to single-night events.
+        \end{itemize}
+
+      \item \textbf{Temporal Distances:}\\
+        Measures of position within the sales calendar.
+        \begin{itemize}
+          \item \textbf{start\_sales\_distance}: days since the start of ticket sales.  \\
+            \emph{Justification:} marks the phase of the sales cycle (initial launch spike versus steady growth).
+          \item \textbf{end\_season\_distance}: days remaining until season close.  \\
+            \emph{Justification:} proximity to season end can spur urgency across shows as the period of availability shrinks.
+          \item \textbf{end\_sales\_distance}: days remaining until the show’s final performance.  \\
+            \emph{Justification:} captures last-minute buying behavior as audiences scramble before the final date.
+          \item \textbf{sales\_duration}: total days tickets are on sale.  \\
+            \emph{Justification:} informs expected trend shape (long campaigns may plateau; short ones often accelerate).
+          \item \textbf{percentage\_sales\_day}: fraction of elapsed sales days relative to \texttt{sales\_duration}.  \\
+            \emph{Justification:} normalizes temporal position, allowing comparison across shows with different sale windows.
+        \end{itemize}
+    \end{itemize}
+
+
+
+    To illustrate typical behaviors, we plot examples of shows with long and short selling periods and those exhibiting a final sales peak. Across these, we observe roughly exponential growth patterns, motivating a logarithmic transformation of sales metrics before modeling.
+
+    
+    Finally, we split the dataset into training, validation, and test sets. To prevent data leakage, all records for a given show are assigned to the same split.
+  
+  
+  \subsection{Managing Features}
+    We now have more features than we actually need to train our model. 
+    To keep things simple at first—and only add complexity when necessary—we require an easy way to 
+    enable or disable individual features. 
+    That’s why, in \verb|/piccolo_teatro/config/__init__.py|, we define our feature set declaratively using Pydantic.
+
+    Pydantic gives us a clean, type-safe, declarative syntax for configuration schemas, 
+    complete with automatic validation, sensible defaults, and informative error messages. 
+    We define a \texttt{Feature} model so that each feature carries its column names, 
+    whether it’s constant or variable, whether it’s enabled, and a function to update it. 
+    This update function comes into play after we predict the next day’s value: we generate the prediction, 
+    then call each feature’s updater to roll forward our feature set.
+    \subsubsection{Code Overview}
+    The following fragment shows the core structure of our feature-management module:
+      \begin{minted}[%
+        breaklines,            % allow long lines to wrap
+        bgcolor=lightgray!20   % subtle background color
+        ]{python}
+        class Feature(BaseModel):
+        columns: List[str]
+        const: bool
+        enabled: bool
+        update: Callable = None
+      \end{minted}
+
+
+      \begin{minted}[%
+      breaklines,            % allow long lines to wrap
+      bgcolor=lightgray!20   % a subtle background color
+      ]{python}
+
+
+      class TrainConfig(BaseModel):
+      periods: List[int] = [2, 4, 6, 8, 10, 15, 20, 30]
+      prediction_period: int = 1
+      target: str = "percentage_bought"
+
+
+      class FeatEngConf(BaseModel):
+      encoding_dict: Dict[str, List[str]] = {
+        "performance_type": [
+        'Internazionale',
+        'Ospitalità',
+        'Collaborazione',
+        'Produzione',
+        'Festival',
+        ],
+      }
+
+      targets_dict: Dict[str, List[int]] = {
+        "gain_cum_sum": [1],
+        "tickets_cum_sum": [1],
+        "gain": [1],
+        "tickets": [1],
+        "percentage_bought": [1],
+      }
+
+
+      class Feature(BaseModel):
+      columns: List[str]
+      const: bool
+      enabled: bool
+      update: Callable = None
+
+
+      class Features:
+      def __init__(self, df: pd.DataFrame = None):
+      self.train_config = TrainConfig()
+      self.feat_eng_conf = FeatEngConf()
+      self.df = df
+      self.new_prediction = None
+      self.new_row = {}
+
+      # Constant features
+      self.performance_capacity = Feature(
+      columns=["performance_capacity"],
+      const=True,
+      enabled=False,
+      update=self.__update_const,
+      )
+      self.num_performances = Feature(
+      columns=["num_performances"],
+      const=True,
+      enabled=False,
+      update=self.__update_const,
+      )
+      ...
+
+      # Variable features
+      self.start_sales_distance = Feature(
+      columns=["start_sales_distance"],
+      const=False,
+      enabled=True,
+      update=self.__update_start_sales_distance,
+      )
+      self.percentage_sales_day = Feature(
+      columns=["percentage_sales_day"],
+      const=False,
+      enabled=True,
+      update=self.__update_percentage_sales_day,
+      )
+      self.tickets_cum_sum = Feature(
+      columns=["tickets_cum_sum"],
+      const=False,
+      enabled=False,
+      )
+      self.percentage_bought = Feature(
+      columns=["percentage_bought"],
+      const=False,
+      enabled=True,
+      update=self.__update_percentage_bought,
+      )
+      ...
+
+      # Generate multi-period features
+      self.__get_percentage_bought_avg(enabled=True)
+      self.__get_percentage_bought_shifted(enabled=True)
+
+      # Classify features
+      self.__get_features()
+
+      def update_features(self, prediction: float):
+      if self.df is None:
+      raise ValueError(
+      "DataFrame is not set. Please provide a DataFrame before updating features."
+      )
+      self.new_prediction = prediction
+      self.new_row = {}
+
+      # Update variable features
+      for feature in self.variable_features:
+      feature.update()
+
+      # Update constant features
+      for feature in self.const_features:
+      feature.update(feature.columns[0])
+
+      self.df = pd.concat([
+      self.df,
+      pd.DataFrame(self.new_row),
+      ], ignore_index=True)
+
+      def __update_const(self, col_name: str):
+      value = self.df[col_name].iloc[-1]
+      self.new_row[col_name] = [value]
+
+      def __update_percentage_bought(self):
+      self.new_row["percentage_bought"] = [self.new_prediction]
+
+      def __update_start_sales_distance(self):
+      last = self.df.iloc[-1]
+      self.new_row["start_sales_distance"] = [last["start_sales_distance"] + 1]
+
+      def __update_percentage_sales_day(self):
+      last = self.df.iloc[-1]
+      day_count = last["start_sales_distance"] + 1
+      duration = self.df["sales_duration"].iloc[0]
+      self.new_row["percentage_sales_day"] = [day_count / duration]
+      ...
+      \end{minted}
+
+
+
+
+
+\end{document}
+
+

@@ -15,7 +15,6 @@ path = os.environ.get("FOLDER_PATH")
 
 feat_eng_conf = FeatEngConf()
 encoding_dict = feat_eng_conf.encoding_dict
-targets_dict = feat_eng_conf.targets_dict
 
 def get_season_dates(seasons_df, season_id: str):
     season_row = seasons_df[seasons_df["season_id"] == season_id]
@@ -33,10 +32,10 @@ def add_show_info(products_df, df, show_id):
 
 
     performance_state = performances_same_show["performance_state"].iloc[0]
-    performance_type = performances_same_show["show_type"].iloc[0]
+    show_type = performances_same_show["show_type"].iloc[0]
     preformance_season = performances_same_show["season_name"].iloc[0]
     performance_space = performances_same_show["space"].iloc[0]
-    performance_capacity = sum(performances_same_show["max_tickets"])
+    show_capacity = sum(performances_same_show["max_tickets"])
     
 
 
@@ -79,9 +78,9 @@ def add_show_info(products_df, df, show_id):
         "Teatro Grassi"
     ]
 
-    if performance_state=="In esecuzione" and performance_type not in performances_to_not_consider and performance_space in spaces_to_consider:
-        df["performance_type"] = performance_type
-        df["performance_capacity"] = performance_capacity
+    if performance_state=="In esecuzione" and show_type not in performances_to_not_consider and performance_space in spaces_to_consider:
+        df["show_type"] = show_type 
+        df["show_capacity"] = show_capacity 
         df["num_performances"] = len(performances_same_show)
         df["last_date"] = last_date
         df = one_hot_encode(df, encoding_dict)
@@ -138,8 +137,8 @@ def add_features(seasons: Seasons, products: Products, df: pd.DataFrame, live_da
         
         
             # Numero biglietti rimanenti per raggiungere capienza massima
-            df["remaining_tickets"] = df["performance_capacity"]-df["tickets_cum_sum"]
-            df["percentage_bought"] = df["tickets_cum_sum"]/df["performance_capacity"]
+            df["remaining_tickets"] = df["show_capacity"]-df["tickets_cum_sum"]
+            df["percentage_bought"] = df["tickets_cum_sum"]/df["show_capacity"]
             df["percentage_bought"] = df["percentage_bought"]
 
             # Aggiungo medie mobili con differenti periodi
@@ -149,7 +148,7 @@ def add_features(seasons: Seasons, products: Products, df: pd.DataFrame, live_da
             df = add_shifted_values(df, ["gain_cum_sum", "tickets_cum_sum", "percentage_bought"], [2,4,6,8,10,15,20,30])
             
             # Aggiungo i possibili target da prevedere:
-            df = add_targets(df, targets_dict)
+            df = add_targets(df)
             
         else:
             df = pd.DataFrame()

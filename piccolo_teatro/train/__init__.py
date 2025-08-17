@@ -28,12 +28,11 @@ def separete_features_targets(df, sort=False, shuffle=False):
     if shuffle:
         df = df.sample(frac=1)
 
-    target_col = f"TARGET_{train_config.target}_{train_config.prediction_period}"
+    target_col = f"TARGET_{train_config.target}"
     if target_col in df:
         Y = df[target_col]
     X = df.drop(columns=[target_col])
     return X, Y
-
 
 def keep_enabled_columns(df):
     """
@@ -41,7 +40,7 @@ def keep_enabled_columns(df):
     """
     # Removing not needed features
     features = features_config.enabled_features
-    target_col = f"TARGET_{train_config.target}_{train_config.prediction_period}"
+    target_col = f"TARGET_{train_config.target}"
     columns_to_keep = ["date", target_col]
     for feature in features:
         if feature.enabled:

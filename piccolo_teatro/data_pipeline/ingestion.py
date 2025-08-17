@@ -4,6 +4,7 @@ import pandas as pd
 
 class Sales():
     def __init__(self, initial_df):
+        # Dictionary mapping original column names to desired names
         self.sales_cols = {
             "D_SALES_LIST_SALES_Individuali_Gruppi": "individuali_gruppi",
             "D_SALES_LIST_SALES_Tipologia_canale": "online_offline",
@@ -19,12 +20,16 @@ class Sales():
             "D_CONFIG_PROD_LIST_T_PERFORMANCE_ID": "performance_id",
         }
 
+        # Seasons to exclude (covid-seasons+season with missing sales)
         self.seasons_to_remove = [1346872739,
                             2070233463,
                             1112493566,
                             1098863756]
 
-        self.operations_to_remove = [
+        # Keep only show ticket sales:
+        # - PRODUCT_COMPOSITION: sales via subscription
+        # - SINGLE_ENTRY: single‐ticket purchases
+        self.operations_to_keep = [
                     "PRODUCT_COMPOSITION",
                     "SINGLE_ENTRY",
                 ]
@@ -32,16 +37,18 @@ class Sales():
         self.rename_cols()
 
     def rename_cols(self):
-        # Some columns have a space before the name, to remove it:
+        # Some columns have a space before the name, we need to remove it:
         self.df = self.df.rename(columns=lambda x: x.lstrip())
         self.df = self.df.rename(columns=self.sales_cols)
 
     def assign_types(self):
+        # Ensure 'gain' values use dot as decimal separator if stored as strings
         if type(self.df["gain"].iloc[0]) == str:
             self.df["gain"] = self.df["gain"].str.replace(",",".")
         
         self.df = self.df.dropna(subset=list(self.sales_cols.values()))
 
+        # Cast columns to appropriate types
         self.df = self.df.astype({
             "individuali_gruppi": str,
             "online_offline": str,
@@ -74,13 +81,12 @@ class Sales():
         
         self.df['season_id'] = self.df['season_id'].astype(int)
 
-        # Remove sales in covid seasons
+        # Exclude sales from specified seasons
         self.df = self.df[~self.df['season_id'].isin(self.seasons_to_remove)]
 
-        # removing sales of products that are not shows
-        # SALES = SALES[SALES['D_SALES_LIST_SALES_T_OPERATION_KIND'] == "SIMPLE_PRODUCT"]
+        # Keep only desired operation kinds (shows)
         self.df = self.df[self.df['operation_kind'].isin(
-            self.operations_to_remove)]
+            self.operations_to_keep)]
         
         # considering only sales operations
         self.df = self.df[self.df['operation_type'] == "Venduti"]
@@ -105,9 +111,6 @@ class Sales():
         self.assign_types()
         self.clean_rows()
         self.clean_cols()
-
-
-
 
 
 class Products():
