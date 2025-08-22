@@ -1,125 +1,66 @@
-"""Utilities for training an XGBoost model.
+import os
+import glob
+from piccolo_teatro.config import XGBConfig
+from piccolo_teatro.trend_simulation import predict_trend
+import xgboost as xgb
+import pandas as pd
+import matplotlib.pyplot as plt
 
-The previous version of this module contained a minimal wrapper around
-``XGBRegressor``.  In order to obtain more reliable predictions we now
-incorporate a cross‑validated hyper‑parameter search together with
-early stopping on a validation set.  The function exposed by this
-module returns both the fitted model and the information gathered
-during the training phase so that callers can log or further analyse
-the results.
-"""
-
-from __future__ import annotations
-
-from typing import Dict, Tuple, Optional
-
-from sklearn.metrics import mean_absolute_error
-from sklearn.model_selection import RandomizedSearchCV, TimeSeriesSplit
-from xgboost import XGBRegressor
-
-from piccolo_teatro.config import TrainConfig
-
-
-# Instantiate the training configuration once so that the same values
-# are reused across function calls.
-train_conf = TrainConfig()
-
+xgb_config =  XGBConfig()
 
 def train_xgb(
     train_X,
     train_Y,
-    validation_X=None,
-    validation_Y=None,
-) -> Tuple[XGBRegressor, Dict, Optional[float]]:
-    """Train an ``XGBRegressor`` using robust practices.
+    validation_X,
+    validation_Y,
+):
+    dtrain = xgb.DMatrix(train_X, label=train_Y)
+    dval   = xgb.DMatrix(validation_X, label=validation_Y)
 
-    Parameters
-    ----------
-    train_X, train_Y:
-        Feature matrix and target vector used for fitting the model.
-    validation_X, validation_Y:
-        Optional hold‑out set employed both for early stopping and for
-        reporting the final validation error.  When not provided the
-        model is trained on the full dataset without early stopping.
-
-    Returns
-    -------
-    model : ``XGBRegressor``
-        The fitted model using the best hyper‑parameters discovered.
-    best_params : ``dict``
-        Hyper‑parameter configuration chosen by the search procedure.
-    val_mae : ``float`` or ``None``
-        Mean absolute error on the validation set.  ``None`` when no
-        validation data is supplied.
-
-    Notes
-    -----
-    The function first performs a hyper‑parameter search using a
-    time‑series aware cross validation.  The best configuration is then
-    used to train a final model with optional early stopping.  This
-    approach is considerably more robust than fitting a model with a
-    single, fixed set of parameters.
-    """
-
-    # ------------------------------------------------------------------
-    # 1) Hyper‑parameter optimisation
-    # ------------------------------------------------------------------
-    # Base estimator with objective taken from the configuration.
-    base_model = XGBRegressor(
-        objective=train_conf.parameters["objective"],
-        random_state=42,
-        tree_method="hist",  # faster training on CPUs
+    bst = xgb.train(
+        xgb_config.parameters, 
+        dtrain,
+        num_boost_round=100,
+        evals=[(dtrain, "train"), (dval, "valid")],
+        #feval=multi_step_mse_eval,
+        maximize=False,
+        #early_stopping_rounds=20,
+        #verbose_eval=10
     )
 
-    # TimeSeriesSplit preserves the temporal order of observations, an
-    # essential requirement when dealing with sequential data.
-    tscv = TimeSeriesSplit(n_splits=train_conf.cv_splits)
+    return bst 
 
-    search = RandomizedSearchCV(
-        estimator=base_model,
-        param_distributions=train_conf.param_grid,
-        n_iter=20,  # number of sampled combinations
-        scoring="neg_mean_absolute_error",
-        cv=tscv,
-        random_state=42,
-        n_jobs=-1,  # use all available cores
-        verbose=1,
-    )
+def test_xgb(model, offset=0.4):
+    path = os.environ.get("FOLDER_PATH")
+    # 1. List all gzip files in the folder
+    folder = os.path.join(path, "shows", "test")
+    parquet_files = glob.glob(os.path.join(folder, "*.gzip"))
 
-    search.fit(train_X, train_Y)
-
-    # Merge default parameters with the ones found by the search so
-    # that unspecified settings (such as the objective) are preserved.
-    best_params = {**train_conf.parameters, **search.best_params_}
-
-    # ------------------------------------------------------------------
-    # 2) Train final model with early stopping
-    # ------------------------------------------------------------------
-    model = XGBRegressor(**best_params, random_state=42)
-
-    val_mae: Optional[float] = None
-    if validation_X is not None and validation_Y is not None:
-        # Early stopping helps preventing over‑fitting on sequential
-        # data by monitoring the error on a validation set.
-        model.fit(
-            train_X,
-            train_Y,
-            eval_set=[(validation_X, validation_Y)],
-            early_stopping_rounds=20,
-            verbose=False,
-        )
-
-        # Calculate the mean absolute error on the validation set to
-        # provide a quantitative estimate of the model performance.
-        val_predictions = model.predict(validation_X)
-        val_mae = mean_absolute_error(validation_Y, val_predictions)
-    else:
-        # When no validation set is supplied we simply fit on the full
-        # data without early stopping.
-        model.fit(train_X, train_Y)
-
-    return model, best_params, val_mae
+    # 1. List all gzip files in the folder
+    folder = os.path.join(path, "shows", "test")
+    parquet_files = glob.glob(os.path.join(folder, "*.gzip"))
+    for file_name in parquet_files:
+        print(file_name)
+        show_df = pd.read_parquet(file_name)
+        
+        print("show_df")
+        print(show_df)
+        sales_duration = show_df["sales_duration"].iloc[0]
+        
+        # 1. Select only the two columns and make a copy
+        target = show_df[['date', 'percentage_bought']].copy()
+        # 2. Parse your dates
+        target['date'] = pd.to_datetime(target['date'], format='%d/%m/%Y')
+        # 3. Move the date column into the index
+        target.set_index('date', inplace=True)
 
 
-__all__ = ["train_xgb"]
+        known_df = show_df.head(int(sales_duration * offset)).copy()
+
+
+        predictions = predict_trend(known_df, model, show_df["last_date"][0])
+        print(show_df["last_date"][0], show_df["sales_duration"][0], type(show_df["last_date"][0]))
+        plt.plot(target , color="blue")
+        plt.plot(predictions, color="orange")
+        plt.show()
 

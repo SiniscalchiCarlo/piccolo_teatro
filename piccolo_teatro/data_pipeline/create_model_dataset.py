@@ -4,33 +4,38 @@ from dotenv import load_dotenv, find_dotenv
 import logging
 
 
-from ..config import FeatEngConf
 from . import clean_data
 from .ingestion import Sales, Products, Seasons
 from .transformation import add_features
+from piccolo_teatro import ts_engine
 
 logger = logging.getLogger(__name__)
 
 load_dotenv(find_dotenv())
 path = os.environ.get("FOLDER_PATH")
 
-feat_eng_conf = FeatEngConf()
-encoding_dict = feat_eng_conf.encoding_dict
+encoding_dict = ts_engine.encoding_dict
 
 pd.set_option("display.max_columns", None)
 load_dotenv(find_dotenv())
 
 
 
-def save_splits(train: pd.DataFrame, validation: pd.DataFrame, test: pd.DataFrame, path: str) -> None:
+def save_splits(train: pd.DataFrame, validation: pd.DataFrame, test: pd.DataFrame, path: str, save_csv=False) -> None:
     """Saves the train, validation, and test datasets to disk."""
 
     train.to_parquet(f"{path}/train_trend.gzip", index=False)
     validation.to_parquet(f"{path}/validation_trend.gzip", index=False)
     test.to_parquet(f"{path}/test_trend.gzip", index=False)
 
+    if save_csv:
+        train.to_csv(f"{path}/train_trend.csv", index=False)
+        validation.to_csv(f"{path}/validation_trend.csv", index=False)
+        test.to_csv(f"{path}/test_trend.csv", index=False)
 
-def create_full_datasets(sales: Sales, products: Products, seasons: Seasons, path: str, save_csv=False, train_dim=0.6, val_dim=0):
+
+
+def create_full_datasets(sales: Sales, products: Products, seasons: Seasons, path: str, save_csv=False, train_dim=0.6, val_dim=0.2):
     '''
     Splits the input sales data into training, validation, and test datasets,
     while maintaining time series continuity for each show. Each show's data
@@ -47,7 +52,16 @@ def create_full_datasets(sales: Sales, products: Products, seasons: Seasons, pat
     Output:
         Saves the resulting datasets (train, validation, test) and individual show files
         as Parquet files in the specified path.
+        Also saves a dataset file for each show inside a train/validation/test folder, so it is easier to 
+        test how the model will predict the trend for a particular show.
     '''
+    save_folder = f"{path}/shows/"
+    if not os.path.isdir(save_folder):
+        os.makedirs(save_folder)
+        os.makedirs(save_folder+"/train/")
+        os.makedirs(save_folder+"/validation/")
+        os.makedirs(save_folder+"/test/")
+
     TRAIN = pd.DataFrame()
     VALIDATION = pd.DataFrame()
     TEST = pd.DataFrame()
@@ -62,26 +76,34 @@ def create_full_datasets(sales: Sales, products: Products, seasons: Seasons, pat
 
     for i, (show_id, group) in enumerate(groups):
         print(f"{(i+1)/total_shows:.2%} processed")
-
+        
         group = add_features(seasons=seasons,
                              products=products,
                              df=group,
                              live_data=False)
-        
-            
-        group.to_parquet(f"{path}/shows/{show_id}.gzip", index=False)
-
-        if save_csv:
-            group.to_csv(f"{path}/shows/csv/{show_id}.csv", index=False)
 
         if train_shows < train_limit:
-            TRAIN = pd.concat([TRAIN, group], ignore_index=True)
+            if len(group)>10:
+                TRAIN = pd.concat([TRAIN, group], ignore_index=True)
             train_shows +=1
+            folder = "train"
         elif val_shows < val_limit and val_dim!=0:
-            VALIDATION = pd.concat([VALIDATION, group], ignore_index=True)
+            if len(group)>10:
+                VALIDATION = pd.concat([VALIDATION, group], ignore_index=True)
             val_shows+=1
+            folder = "validation"
         else:
-            TEST = pd.concat([TEST, group], ignore_index=True)
+            if len(group)>10:
+                TEST = pd.concat([TEST, group], ignore_index=True)
+            folder = "test"
+        
+        # We save the data only if has at least 10 days of sales
+        if len(group.index.unique().tolist())>10:
+            cols_with_missing = group.columns[group.isna().any()].tolist()
+            rows_with_missing = group.index[group.isna().any(axis=1)].tolist()
+            group.to_parquet(f"{path}/shows/{folder}/{show_id}.gzip", index=False)
+            if save_csv:
+                group.to_csv(f"{path}/shows/{folder}/{show_id}.csv", index=False)
 
     return TRAIN, VALIDATION, TEST
 
@@ -102,5 +124,5 @@ print("Seasons Df:")
 print(f"Shape: {seasons.df.shape[0]} rows × {seasons.df.shape[1]} cols")
 print(seasons.df.dtypes)
 TRAIN, VALIDATION, TEST = create_full_datasets(sales, products, seasons, path, save_csv=True)
-save_splits(TRAIN, VALIDATION, TEST, path)
+save_splits(TRAIN, VALIDATION, TEST, path, save_csv=True)
 

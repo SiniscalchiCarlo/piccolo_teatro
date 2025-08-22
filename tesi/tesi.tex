@@ -405,12 +405,88 @@ Selezione iniziale delle feature:
 - Significatività statistica
 - Feature importance relativa
 - 
-\section{XGB}
+\section{XGBoost (XGB)}
+
+\subsection{Targets}
+\begin{itemize}
+  \item \textbf{One-step ahead percentage} \(y_{t+1} = \%\text{sold}_{t+1}\).  
+        \emph{Pros:} simple, matches a classic forecasting setup, low complexity.  
+        \emph{Cons:} only optimizes immediate next-day error, may ignore longer-term trend fidelity.  
+  \item \textbf{Multi-step cumulative change} 
+        \[
+          y^{(H)}_t = \%\text{sold}_{t+H} - \%\text{sold}_{t}
+        \]
+        for a fixed horizon \(H\) (e.g.\ 7 or 14 days).  
+        \emph{Pros:} directly trains on the net movement over a window, captures mid-term momentum.  
+        \emph{Cons:} loses granularity on daily shape, fixed \(H\) may not align with variable remaining days.  
+  \item \textbf{Average slope over horizon}
+        \[
+          y^{(H)}_t = \frac{1}{H}\sum_{h=1}^H\bigl(\%\text{sold}_{t+h}-\%\text{sold}_{t}\bigr).
+        \]
+        \emph{Pros:} focuses on rate of change rather than absolute level, robust to scale differences.  
+        \emph{Cons:} requires reconstructing final levels by integration, may amplify noise in differences.  
+\end{itemize}
+
+\subsection{Loss Function}
+\begin{itemize}
+  \item \textbf{Mean Squared Error (MSE)}  
+        \(\mathcal{L}_{\mathrm{MSE}} = \frac{1}{N}\sum_i (y_i - \hat y_i)^2\).  
+        \emph{Pros:} smooth, differentiable, standard in regression libraries.  
+        \emph{Cons:} heavily penalizes large errors, not trend‐aware over multi‐step.  
+  \item \textbf{Multi-step aggregated MSE}
+        \(\displaystyle \mathcal{L} = \frac{1}{H}\sum_{h=1}^H (y_{t+h} - \hat y_{t+h})^2\).  
+        \emph{Pros:} explicitly optimizes the average error over the forecast horizon.  
+        \emph{Cons:} treats each horizon step equally; may still ignore shape (slope) errors.  
+  \item \textbf{Trend‐penalty loss}
+        \[
+          \mathcal{L} = \sum_{h=1}^H (y_{t+h}-\hat y_{t+h})^2
+          \;+\;\lambda\sum_{h=2}^H\bigl[(y_{t+h}-y_{t+h-1}) - (\hat y_{t+h}-\hat y_{t+h-1})\bigr]^2.
+        \]
+        \emph{Pros:} balances pointwise accuracy and curve‐shape fidelity by penalizing slope mismatches.  
+        \emph{Cons:} introduces hyperparameter \(\lambda\), more complex gradient/hessian computation.  
+  \item \textbf{Quantile loss (pinball loss)}  
+        \(\mathcal{L}_q = \sum_i\max\bigl(q(y_i - \hat y_i),\,(q-1)(y_i - \hat y_i)\bigr)\) for quantile \(q\).  
+        \emph{Pros:} directly trains prediction intervals (e.g.\ 2.5\%/97.5\%), robust to outliers.  
+        \emph{Cons:} needs separate models per quantile, may increase training time.  
+\end{itemize}
+
+\subsection{Evaluation Metrics}
+\paragraph{Point-wise accuracy}
+\begin{itemize}
+  \item \textbf{RMSE:} \(\sqrt{\tfrac{1}{H}\sum_h (y_{t+h} - \hat y_{t+h})^2}\). Good for penalizing large deviations, but scale‐dependent.
+  \item \textbf{MAE:} \(\tfrac{1}{H}\sum_h |y_{t+h} - \hat y_{t+h}|\). More robust to outliers, easier to interpret in original units.
+  \item \textbf{sMAPE:} \(\tfrac{100\%}{H}\sum_h\frac{|\hat y - y|}{(|y|+|\hat y|)/2}\). Symmetric, normalizes scale.
+  \item \textbf{MASE:} scales MAE by naïve‐forecast error, enabling cross‐series comparison.
+\end{itemize}
+
+\paragraph{Shape‐focused metrics}
+\begin{itemize}
+  \item \textbf{Normalized RMSE on normalized curves (NRMSE):}
+        compute RMSE after scaling both series to \([0,1]\). Scale‐invariant.
+  \item \textbf{1 – Pearson correlation:}
+        \(1 - \mathrm{corr}(\{s\},\{\hat s\})\). Measures shape alignment, ignores scale.
+  \item \textbf{Dynamic Time Warping (DTW):}
+        elastic distance between true and predicted curve, robust to temporal shifts.
+  \item \textbf{Shape‐Based Distance (SBD):}
+        \(1 - \max_\tau\mathrm{corr}(s, \hat s\ \text{shifted by }\tau)\). Captures best‐lag alignment.
+  \item \textbf{Directional Accuracy:}
+        fraction of days where \(\mathrm{sign}(\Delta y)=\mathrm{sign}(\Delta \hat y)\). Evaluates correct trend direction.
+\end{itemize}
+
+
+\subsection{Confidence Interval}
 - Definizione dei parametri iniziali e Cross‐validation con early stopping
 - Training
 - Feature importance
 - SHAP
 - Ottimizzazione avanzata Bayes, Hyperopt o Optuna per eta, max_depth, min_child_weight, colsample_*, subsample, lambda, alpha.
 - Schemi di sampling più sofisticati (sklearn wrappers, GPU boost)
+
+\section{Multi output vector}
+\begin{itemize}
+  \item \textbf{Multi-output vector} \([\%\text{sold}_{t+1},\dots,\%\text{sold}_{t+H}]\) via a single model.
+        \emph{Pros:} direct joint training on entire horizon, no chaining error accumulation.  
+        \emph{Cons:} increases dimensionality and model complexity, may require more data to train reliably.
+  \end{itemize}
 \end{document}
 

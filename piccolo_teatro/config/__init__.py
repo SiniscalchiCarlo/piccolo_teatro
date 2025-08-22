@@ -1,6 +1,7 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, confloat
 from typing import List, Dict, Callable
 import pandas as pd
+from skopt.space import Real, Integer
 
 
 def add_moving_avarages(df, column_names: list[str], periods: list[int]) -> dict:
@@ -26,54 +27,33 @@ def add_shifted_values(df, column_names: list[str], periods: list[int]) -> dict:
             result[col_name + f"_shifted_{period}"] = shifted_val
     return result
 
-
-class TrainConfig(BaseModel):
-    """Configuration container used throughout the training pipeline.
-
-    It stores both modelling parameters and feature engineering
-    information so that every component of the project can access the
-    same configuration instance.  The default values are sensible
-    starting points but can easily be overridden by instantiating the
-    class with different arguments.
-    """
-
-    # --- Feature engineering configuration ---
-    periods: List[int] = [2, 4, 6, 8, 10, 15, 20, 30]
-
-    # --- Modelling configuration ---
-    target: str = "percentage_bought"
-    model: str = "xgb"
-
-    # Default parameters used to initialise the model before tuning.
+class XGBConfig(BaseModel):
     parameters: dict = {
-        "n_estimators": 200,
-        "learning_rate": 0.1,
-        "objective": "reg:squarederror",
+        "eta": 0.3,               # learning rate
+        "max_depth": 6,           # maximum tree depth
+        "min_child_weight": 1,    # minimum sum Hessian in a leaf
+        "gamma": 0,               # minimum loss reduction for a split
+        "subsample": 1,           # row subsampling ratio
+        "colsample_bytree": 1,    # feature subsampling ratio per tree
+        "lambda": 1,              # L2 regularization term
+        "alpha": 0,               # L1 regularization term
     }
 
-    # Grid of parameters explored during hyper‑parameter optimisation.
-    # The ranges are purposely wide to allow the search procedure to
-    # discover well performing combinations.  Only the parameters
-    # relevant for the XGBoost model are included.
-    param_grid: Dict[str, List] = {
-        "n_estimators": [100, 200, 400],
-        "max_depth": [3, 5, 7],
-        "learning_rate": [0.01, 0.05, 0.1],
-        "subsample": [0.8, 1.0],
-        "colsample_bytree": [0.8, 1.0],
+    param_space: dict = {
+        'n_estimators': Integer(50, 500),
+        'max_depth': Integer(3, 12),
+        'learning_rate': Real(1e-3, 1e-1, prior='log-uniform'),
+        'subsample': Real(0.5, 1.0),
+        'colsample_bytree': Real(0.5, 1.0),
+        'gamma': Real(0, 5),
+        'reg_alpha': Real(1e-8, 1.0, prior='log-uniform'),
+        'reg_lambda': Real(1e-8, 1.0, prior='log-uniform')
     }
+    
+    ic_dim: confloat(ge=0.0, le=1.0) = 0.9
 
-    # Number of splits used by the time series cross validation.
-    cv_splits: int = 5
 
-    # Name of the file where the trained model will be stored.
     file_name: str = "xgb_trend"
-
-class FeatEngConf(BaseModel):
-    encoding_dict: Dict[str, List[str]] = {
-        "show_type": ['Internazionale', 'Ospitalità', 'Collaborazione', 'Produzione', 'Festival'],
-    #    "performance_day": ["lun", "mar", "mer", "gio", "ven", "sab", "dom"],
-    }
 
 class Feature(BaseModel):
     columns: List[str]
@@ -81,15 +61,21 @@ class Feature(BaseModel):
     enabled: bool
     update: Callable = None
 
-class Features:
+class TimeSeriesEngine:
     def __init__(self, df=None):
-        self.train_config = TrainConfig()
-        self.feat_eng_conf = FeatEngConf()
         self.df = df
         self.new_predicition = None
+        self.periods = [2, 4, 6, 8, 10, 15, 20, 30]
+        self.target = "percentage_bought"
+
+        self.encoding_dict = {
+            "show_type": ['Internazionale', 'Ospitalità', 'Collaborazione', 'Produzione', 'Festival'],
+            #    "performance_day": ["lun", "mar", "mer", "gio", "ven", "sab", "dom"],
+        }
+
 
         # Initialization of constant features
-        #self.performance_day: Feature = Feature(columns=self.feat_eng_conf.encoding_dict["performance_day"],
+        #self.performance_day: Feature = Feature(columns=self.encoding_dict["performance_day"],
         #                                            const=True,
         #                                            enabled=False,
         #                                            update=self.__update_const)
@@ -102,7 +88,7 @@ class Features:
         #                                                    enabled=False,
         #                                                    update=self.__update_const)
 
-        self.show_type: Feature = Feature(columns=self.feat_eng_conf.encoding_dict["show_type"],
+        self.show_type: Feature = Feature(columns=self.encoding_dict["show_type"],
                                                         const=True,
                                                         enabled=False,
                                                         update=self.__update_const)
@@ -204,7 +190,7 @@ class Features:
                         self.variable_features.append(value)
 
     def __create_period_names(self, col_name: str) -> List[str]:
-        return [col_name+"_"+str(period) for period in self.train_config.periods]
+        return [col_name+"_"+str(period) for period in self.periods]
         # columns = self.__create_period_names("tickets_shifted")
         # self.tickets_shifted = Feature(columns=columns,
          #                            const=False,
@@ -234,10 +220,10 @@ class Features:
         self.new_row["percentage_bought"] = [self.new_predicition]
 
     def __update_percentage_bought_avg(self):
-        self.new_row.update(add_moving_avarages(self.df, ["percentage_bought"], self.train_config.periods))
+        self.new_row.update(add_moving_avarages(self.df, ["percentage_bought"], self.periods))
 
     def __update_percentage_bought_shifted(self):
-        self.new_row.update(add_shifted_values(self.df, ["percentage_bought"], self.train_config.periods))
+        self.new_row.update(add_shifted_values(self.df, ["percentage_bought"], self.periods))
 
     def __update_start_sales_distance(self):
         last_row = self.df.iloc[[-1]]
@@ -257,30 +243,28 @@ class Features:
         self.new_row["percentage_sales_day"] = [new_value]
        
 
-def config_recap():
-    train_conf = TrainConfig()
-    features = Features()
-    const_feat = features.const_features
-    variable_feat = features.variable_features
+    def config_recap(self):
+        const_feat = self.const_features
+        variable_feat = self.variable_features
 
-    print("Training Config\n")
-    print("Target:", train_conf.target)
-    print("Constant Features:")
-    for feat in const_feat:
-        if len(feat.columns)==1:
-            print(f" ${feat.columns[0]}")
-        else:
-            print(f" ${feat.columns[0]}, ... , ${feat.columns[-1]}")
+        print("Training Config\n")
+        print("Target:", self.target)
+        print("Constant Features:")
+        for feat in const_feat:
+            if len(feat.columns)==1:
+                print(f" {feat.columns[0]}")
+            else:
+                print(f" {feat.columns[0]}, ... , {feat.columns[-1]}")
 
 
-    print("Variable Features:")
-    for feat in variable_feat:
-        if len(feat.columns)==1:
-            print(f" ${feat.columns[0]}")
-        else:
-            print(f" ${feat.columns[0]}, ... , ${feat.columns[-1]}")
+        print("Variable Features:")
+        for feat in variable_feat:
+            if len(feat.columns)==1:
+                print(f" {feat.columns[0]}")
+            else:
+                print(f" {feat.columns[0]}, ... , {feat.columns[-1]}")
 
- 
-    print("MA e Lag periods:", train_conf.periods)
-    print("")
+     
+        print("MA e Lag periods:", self.periods)
+        print("")
 

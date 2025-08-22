@@ -2,7 +2,7 @@ import pandas as pd
 import os
 from dotenv import load_dotenv, find_dotenv
 
-from ..config import FeatEngConf
+from piccolo_teatro import ts_engine
 from .utils import one_hot_encode, add_cumulative_sum, add_moving_avarages, add_shifted_values, add_targets
 from .ingestion import Sales, Products, Seasons
 import logging
@@ -12,9 +12,7 @@ logger = logging.getLogger(__name__)
 
 load_dotenv(find_dotenv())
 path = os.environ.get("FOLDER_PATH")
-
-feat_eng_conf = FeatEngConf()
-encoding_dict = feat_eng_conf.encoding_dict
+encoding_dict = ts_engine.encoding_dict
 
 def get_season_dates(seasons_df, season_id: str):
     season_row = seasons_df[seasons_df["season_id"] == season_id]

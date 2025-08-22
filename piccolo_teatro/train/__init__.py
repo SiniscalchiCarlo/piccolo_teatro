@@ -1,11 +1,8 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.metrics import mean_absolute_error
+from piccolo_teatro import ts_engine
 
-from ..config import TrainConfig, Features, TrainConfig
-
-features_config: Features = Features()
-train_config: TrainConfig = TrainConfig()
 
 def separete_features_targets(df, sort=False, shuffle=False):
     """
@@ -28,7 +25,7 @@ def separete_features_targets(df, sort=False, shuffle=False):
     if shuffle:
         df = df.sample(frac=1)
 
-    target_col = f"TARGET_{train_config.target}"
+    target_col = f"TARGET_{ts_engine.target}"
     if target_col in df:
         Y = df[target_col]
     X = df.drop(columns=[target_col])
@@ -39,8 +36,8 @@ def keep_enabled_columns(df):
     Keeps only the enabled features and the target column
     """
     # Removing not needed features
-    features = features_config.enabled_features
-    target_col = f"TARGET_{train_config.target}"
+    features = ts_engine.enabled_features
+    target_col = f"TARGET_{ts_engine.target}"
     columns_to_keep = ["date", target_col]
     for feature in features:
         if feature.enabled:

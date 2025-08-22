@@ -18,4 +18,11 @@
 \contentsline {subsection}{\numberline {0.5.3}Valutazione del modello}{11}{subsection.0.5.3}%
 \contentsline {subsection}{\numberline {0.5.4}Regolarizzazione se necessario}{11}{subsection.0.5.4}%
 \contentsline {subsection}{\numberline {0.5.5}Interpretazione e Reporting}{11}{subsection.0.5.5}%
-\contentsline {section}{\numberline {0.6}XGB}{12}{section.0.6}%
+\contentsline {section}{\numberline {0.6}XGBoost (XGB)}{12}{section.0.6}%
+\contentsline {subsection}{\numberline {0.6.1}Targets}{12}{subsection.0.6.1}%
+\contentsline {subsection}{\numberline {0.6.2}Loss Function}{12}{subsection.0.6.2}%
+\contentsline {subsection}{\numberline {0.6.3}Evaluation Metrics}{13}{subsection.0.6.3}%
+\contentsline {paragraph}{Point-wise accuracy}{13}{section*.4}%
+\contentsline {paragraph}{Shape‐focused metrics}{13}{section*.5}%
+\contentsline {subsection}{\numberline {0.6.4}Confidence Interval}{13}{subsection.0.6.4}%
+\contentsline {section}{\numberline {0.7}Multi output vector}{13}{section.0.7}%

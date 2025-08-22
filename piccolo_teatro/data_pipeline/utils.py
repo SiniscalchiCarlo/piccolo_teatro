@@ -1,5 +1,5 @@
 import pandas as pd
-from piccolo_teatro.config import TrainConfig
+from piccolo_teatro import ts_engine
 
 def one_hot_encode(df, encoding_dict):
     for col_name in encoding_dict:
@@ -34,8 +34,7 @@ def print_unique_values(df):
         print(f"{col_name}: {df[col_name].unique()[:10]}")
 
 def add_targets(df):
-    train_conf = TrainConfig()
-    col_name = train_conf.target
+    col_name = ts_engine.target
     df[f"TARGET_{col_name}"] = df[col_name].shift(-1)
     df = df.iloc[:-1]
     return df
