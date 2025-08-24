@@ -1,31 +1,7 @@
 from pydantic import BaseModel, confloat
-from typing import List, Dict, Callable
+from typing import List, Dict, Callable, Literal
 import pandas as pd
 from skopt.space import Real, Integer
-
-
-def add_moving_avarages(df, column_names: list[str], periods: list[int]) -> dict:
-    result = {}
-    for period in periods:
-        for col_name in column_names:
-            col_avg = df[col_name].rolling(period).mean()
-            last_val = col_avg.iloc[-1]
-            # If NaN (due to short length), fill with first value
-            if pd.isna(last_val):
-                last_val = df[col_name].iloc[0]
-            result[col_name + f"_avg_{period}"] = last_val
-    return result
-
-def add_shifted_values(df, column_names: list[str], periods: list[int]) -> dict:
-    result = {}
-    for period in periods:
-        for col_name in column_names:
-            shifted_val = df[col_name].shift(period).iloc[-1]
-            # If NaN (e.g. shift out of bounds), fill with first value
-            if pd.isna(shifted_val):
-                shifted_val = df[col_name].iloc[0]
-            result[col_name + f"_shifted_{period}"] = shifted_val
-    return result
 
 class XGBConfig(BaseModel):
     parameters: dict = {
@@ -53,20 +29,26 @@ class XGBConfig(BaseModel):
     ic_dim: confloat(ge=0.0, le=1.0) = 0.9
 
 
-    file_name: str = "xgb_trend"
-
 class Feature(BaseModel):
     columns: List[str]
     const: bool
     enabled: bool
     update: Callable = None
 
+class ProblemConfig(BaseModel):
+    periods: List[int] = [2, 4, 6, 8, 10, 15, 20, 30]
+    target: Literal["percentage_bought", "percentage_bought_delta", "percentage_bought_log1p"]
+    pb_name: str = "xgb_log"
+
+
+problem_config = ProblemConfig(target = "percentage_bought_log1p")
 class TimeSeriesEngine:
     def __init__(self, df=None):
         self.df = df
-        self.new_predicition = None
-        self.periods = [2, 4, 6, 8, 10, 15, 20, 30]
-        self.target = "percentage_bought"
+        self.new_prediction = None
+        self.periods = problem_config.periods
+        self.target = problem_config.target
+        self.pb_name = problem_config.pb_name
 
         self.encoding_dict = {
             "show_type": ['Internazionale', 'Ospitalità', 'Collaborazione', 'Produzione', 'Festival'],
@@ -93,18 +75,15 @@ class TimeSeriesEngine:
                                                         enabled=False,
                                                         update=self.__update_const)
         
-        
         self.show_capacity: Feature = Feature(columns=["show_capacity"],
                                                             const=True,
                                                             enabled=False,
                                                             update=self.__update_const)
         
-        
         self.num_performances: Feature = Feature(columns=["num_performances"],
                                                             const=True,
                                                             enabled=False,
                                                             update=self.__update_const)
-        
         
         self.sales_duration: Feature = Feature(columns=["sales_duration"],
                                                             const=True,
@@ -120,7 +99,7 @@ class TimeSeriesEngine:
         
         self.end_sales_distance: Feature = Feature(columns=["end_sales_distance"],
                                                             const=False,
-                                                            enabled=False,
+                                                            enabled=True,
                                                             update=self.__update_end_sales_distance)
         
         self.end_season_distance: Feature = Feature(columns=["end_season_distance"],
@@ -136,30 +115,32 @@ class TimeSeriesEngine:
                                                         const=False,
                                                         enabled=False)
         
-        self.tickets_cum_sum: Feature = Feature(columns=["tickets_cum_sum"],
-                                                    const=False,
-                                                    enabled=False)
+        # self.tickets_cum_sum: Feature = Feature(columns=["tickets_cum_sum"],
+        #                                             const=False,
+        #                                             enabled=False)
+        # 
+        # self.tickets: Feature = Feature(columns=["tickets"],
+        #                                         const=False,
+        #                                         enabled=False)
         
-        self.tickets: Feature = Feature(columns=["tickets"],
-                                                const=False,
-                                                enabled=False)
-        
-        self.percentage_bought = Feature(columns=["percentage_bought"],
+        self.target_feature = Feature(columns=[self.target],
                                                 const=False,
                                                 enabled=True,
-                                                update=self.__update_percentage_bought)
+                                                update=self.__update_target)
         
         # Calling functions that generate multiple features (es. moving avg of multiple periods)
-        self.__get_percentage_bought_avg(enabled=True)
-        
-        self.__get_percentage_bought_shifted(enabled=True)
+        self.__init_target_avg(enabled=True)
+
+        self.__init_target_delta(enabled=True)
+
+        self.__init_target_shifted(enabled=True)
 
         self.__get_features()
         
     def update_features(self, prediction):
         if self.df is None:
             raise Exception("Please add a input df to Feature class before calling update_features")
-        self.new_predicition = prediction
+        self.new_prediction = prediction
         self.new_row = {}
 
         for feature in self.variable_features:
@@ -191,39 +172,65 @@ class TimeSeriesEngine:
 
     def __create_period_names(self, col_name: str) -> List[str]:
         return [col_name+"_"+str(period) for period in self.periods]
-        # columns = self.__create_period_names("tickets_shifted")
-        # self.tickets_shifted = Feature(columns=columns,
-         #                            const=False,
-         #                            enabled=enabled)
-      
-    def __get_percentage_bought_avg(self, enabled):
-        columns = self.__create_period_names("percentage_bought_avg")
-        self.percentage_bought_avg = Feature(columns=columns,
+
+    # Init methods 
+    def __init_target_avg(self, enabled):
+        columns = self.__create_period_names(f"{self.target}_avg")
+        self.target_avg = Feature(columns=columns,
                                     const=False,
                                     enabled=enabled,
-                                    update=self.__update_percentage_bought_avg
+                                    update=self.__update_target_avg
+                                    )
+       
+
+    def __init_target_delta(self, enabled):
+        columns = self.__create_period_names(f"{self.target}_delta")
+        self.target_delta = Feature(columns=columns,
+                                    const=False,
+                                    enabled=enabled,
+                                    update=self.__update_target_delta
                                     )
         
-    def __get_percentage_bought_shifted(self, enabled):
-        columns = self.__create_period_names("percentage_bought_shifted")
-        self.percentage_bought_shifted = Feature(columns=columns,
+    def __init_target_shifted(self, enabled):
+        columns = self.__create_period_names(f"{self.target}_shifted")
+        self.target_shifted = Feature(columns=columns,
                                     const=False,
                                     enabled=enabled,
-                                    update=self.__update_percentage_bought_shifted)
+                                    update=self.__update_target_shifted)
 
-
+    # Update methods
     def __update_const(self, col_name):
         const_val = self.df[col_name].iloc[-1]
         self.new_row[col_name] = [const_val]
 
-    def __update_percentage_bought(self):
-        self.new_row["percentage_bought"] = [self.new_predicition]
+    def __update_target(self):
+        self.new_row[f"{self.target}"] = [self.new_prediction]
 
-    def __update_percentage_bought_avg(self):
-        self.new_row.update(add_moving_avarages(self.df, ["percentage_bought"], self.periods))
+    def __update_target_avg(self):
+        # concateno storico + nuova predizione
+        values = self.df[f"{self.target}"].tolist() + [self.new_prediction]
+        s = pd.Series(values)
+        for period in self.periods:
+            # rolling mean e prendo solo l'ultimo
+            avg_val = s.rolling(period).mean().iloc[-1]
+            self.new_row[f"{self.target}_avg_{period}"] = avg_val
 
-    def __update_percentage_bought_shifted(self):
-        self.new_row.update(add_shifted_values(self.df, ["percentage_bought"], self.periods))
+    def __update_target_delta(self):
+        values = self.df[f"{self.target}"].tolist() + [self.new_prediction]
+        s = pd.Series(values)
+        for period in self.periods:
+            # differenza tra t e t-period
+            delta_val = s.diff(periods=period).iloc[-1]
+            self.new_row[f"{self.target}_delta_{period}"] = delta_val
+
+    def __update_target_shifted(self):
+        values = self.df[f"{self.target}"].tolist() + [self.new_prediction]
+        s = pd.Series(values)
+        first_val = s.iloc[0]
+        for period in self.periods:
+            # shift e fill dei NaN con il primo valore
+            shifted_val = s.shift(period).fillna(first_val).iloc[-1]
+            self.new_row[f"{self.target}_shifted_{period}"] = shifted_val
 
     def __update_start_sales_distance(self):
         last_row = self.df.iloc[[-1]]
@@ -267,4 +274,5 @@ class TimeSeriesEngine:
      
         print("MA e Lag periods:", self.periods)
         print("")
+
 

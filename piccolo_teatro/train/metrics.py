@@ -63,7 +63,7 @@ class TimeSeriesMetrics:
         Optionally save metrics to a single CSV at save_folder.
 
         Returns:
-          pandas.DataFrame with columns ['id', 'MSE', 'MAE', 'PICP', 'IntervalScore']
+          pandas.DataFrame with columns ['id', 'MSE', 'MAE', 'PICP', 'IS']
         """
         records = []
         show_files = glob.glob(os.path.join(self.folder, "*.csv"))
@@ -83,7 +83,7 @@ class TimeSeriesMetrics:
                         f'MSE_{p}': self.mse(y_true[:p], y_pred[:p]),
                         f'MAE_{p}': self.mae(y_true[:p], y_pred[:p]),
                         f'PICP_{p}': self.picp(y_true[:p], low[:p], up[:p]),
-                        f'IntervalScore_{p}': self.interval_score(y_true[:p], low[:p], up[:p])
+                        f'IS_{p}': self.interval_score(y_true[:p], low[:p], up[:p])
                     }
                 else:
                     rec = {
@@ -91,7 +91,7 @@ class TimeSeriesMetrics:
                         f'MSE_{p}': np.nan,
                         f'MAE_{p}': np.nan,
                         f'PICP_{p}': np.nan,
-                        f'IntervalScore_{p}': np.nan,
+                        f'IS_{p}': np.nan,
                     }
 
             rec = {
@@ -99,15 +99,17 @@ class TimeSeriesMetrics:
                 f'MSE_tot': self.mse(y_true, y_pred),
                 f'MAE_tot': self.mae(y_true, y_pred),
                 f'PICP_tot': self.picp(y_true, low, up),
-                f'IntervalScore_tot': self.interval_score(y_true, low, up)
+                f'IS_tot': self.interval_score(y_true, low, up),
+                "len": len(y_true),
             }
             records.append(rec)
         df = pd.DataFrame.from_records(records)
         if save_folder:
             os.makedirs(os.path.dirname(save_folder), exist_ok=True)
         df.to_csv(save_folder+f"/{name}_metrics.csv", index=False)
-    
-        df = df.drop(columns='id').mean().to_frame(name='mean').T 
+
+        df = df[df["len"]>45]
+        df = df.drop(columns=["id", "len"]).mean().to_frame(name='mean').T 
         df.to_csv(save_folder+f"/{name}_summary.csv", index=False)
         return df
 

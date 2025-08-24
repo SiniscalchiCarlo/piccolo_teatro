@@ -1,3 +1,4 @@
+import time
 import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.metrics import mean_absolute_error
@@ -42,7 +43,6 @@ def keep_enabled_columns(df):
     for feature in features:
         if feature.enabled:
             columns_to_keep += feature.columns
-
     df = df[columns_to_keep]
     return df
 

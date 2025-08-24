@@ -8,7 +8,7 @@ import xgboost as xgb
 
 pd.set_option("display.max_columns", None)
 
-def predict_trend(known_df, model, last_date):
+def predict_trend(known_df, target, model, last_date):
     '''
     Predicts the sales trend of a show:
     Given known features up to day t, this function predicts the cumulative percentage of sales for day t+1.
@@ -36,7 +36,7 @@ def predict_trend(known_df, model, last_date):
         prediction = model.predict(dmat)[0]
         
         # Prediciton need to be always highes than the last percentage 
-        prediction = max(prediction, input_row.iloc[0]["percentage_bought"])
+        prediction = max(prediction, input_row.iloc[0][target])
 
         predictions.append(prediction)
         predicitons_days.append(current_day)

@@ -3,7 +3,7 @@ import os
 from dotenv import load_dotenv, find_dotenv
 
 from piccolo_teatro import ts_engine
-from .utils import one_hot_encode, add_cumulative_sum, add_moving_avarages, add_shifted_values, add_targets
+from .utils import add_deltas, add_log_transform, one_hot_encode, add_cumulative_sum, add_moving_avarages, add_shifted_values, add_targets
 from .ingestion import Sales, Products, Seasons
 import logging
 import time
@@ -137,16 +137,20 @@ def add_features(seasons: Seasons, products: Products, df: pd.DataFrame, live_da
             # Numero biglietti rimanenti per raggiungere capienza massima
             df["remaining_tickets"] = df["show_capacity"]-df["tickets_cum_sum"]
             df["percentage_bought"] = df["tickets_cum_sum"]/df["show_capacity"]
-            df["percentage_bought"] = df["percentage_bought"]
+            df["percentage_bought_delta"] = df["percentage_bought"].diff(periods=1)
 
+            
+            df = add_log_transform(df, "percentage_bought")
+
+            df = add_deltas(df, ["percentage_bought", "percentage_bought_log1p"], [2,4,6,8,10,15,20,30])
             # Aggiungo medie mobili con differenti periodi
-            df = add_moving_avarages(df, ["gain_cum_sum", "tickets_cum_sum", "percentage_bought"], [2,4,6,8,10,15,20,30])
+            df = add_moving_avarages(df, ["percentage_bought_delta", "gain_cum_sum", "tickets_cum_sum", "percentage_bought","percentage_bought_log1p"], [2,4,6,8,10,15,20,30])
 
             # Aggiungo valori shiftati
-            df = add_shifted_values(df, ["gain_cum_sum", "tickets_cum_sum", "percentage_bought"], [2,4,6,8,10,15,20,30])
+            df = add_shifted_values(df, ["percentage_bought_delta", "gain_cum_sum", "tickets_cum_sum", "percentage_bought","percentage_bought_log1p"], [2,4,6,8,10,15,20,30])
             
             # Aggiungo i possibili target da prevedere:
-            df = add_targets(df)
+            df = add_targets(df, ["percentage_bought", "percentage_bought_log1p", "percentage_bought_delta"])
             
         else:
             df = pd.DataFrame()
