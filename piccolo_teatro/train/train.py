@@ -4,7 +4,6 @@ import pandas as pd
 from dotenv import load_dotenv, find_dotenv
 from piccolo_teatro.config import TrainConfig, config_recap
 from piccolo_teatro.train.train_xgb import train_xgb
-from piccolo_teatro.train.utils import df_report
 from piccolo_teatro.trend_simulation import predict_trend
 from xgboost import XGBRegressor
 from . import keep_enabled_columns, separete_features_targets, abs_error
@@ -23,8 +22,6 @@ test_df = keep_enabled_columns(test_df)
 
 train_X, train_Y = separete_features_targets(train_df, sort=False, shuffle=True)
 validation_X, valdiation_Y = separete_features_targets(test_df, sort=False, shuffle=True)
-# Printing dataset report 
-df_report(train_df)
 
 
 # 2) TRAINING THE MODEL

@@ -7,17 +7,18 @@ from dotenv import load_dotenv, find_dotenv
 
 from ..data_pipeline import run_data_pipeline
 from . import predict_trend
+from piccolo_teatro.models import get_model
 
 pd.set_option("display.max_columns", None)
 load_dotenv(find_dotenv())
 path = os.environ.get("FOLDER_PATH")
-model = pickle.load(open(r"C:\Users\39370\Desktop\piccolo_teatro\piccolo_teatro\models\XGB_trend2.pkl", "rb"))
+model = get_model("$xgb_trend")
 
-offset = 0.1
-SALES = pd.read_csv(path+"\\D_SALES_LIST_SALES.csv", index_col=False)
-PRODUCTS = pd.read_csv(path+"\\D_CONFIG_PROD_LIST.csv", index_col=False)
-SEASONS = pd.read_csv(path+"\\stagioni.csv", index_col=False)
-test_df = pd.read_parquet(path+f"\\test_trend.gzip")
+offset = 0.4
+SALES = pd.read_csv(path+"/D_SALES_LIST_SALES.csv", index_col=False)
+PRODUCTS = pd.read_csv(path+"/D_CONFIG_PROD_LIST.csv", index_col=False)
+SEASONS = pd.read_csv(path+"/stagioni.csv", index_col=False)
+test_df = pd.read_parquet(path+f"/test_trend.gzip")
 
 ids = test_df['show_id'].unique().tolist()
 print(test_df)
@@ -25,8 +26,8 @@ ids = random.sample(ids, k=len(ids))
 
 print("len ids", len(ids))
 for show_id in ids:
-    show_id = 10228587066800
     df = run_data_pipeline(SALES, PRODUCTS, SEASONS, show_id)
+
     print(df)
     print("len df", len(df))
     # We are simulationg we don't know all the data
@@ -37,6 +38,5 @@ for show_id in ids:
 
     # Plotting
     plt.plot(predicted_trend)
-    plt.show()
     plt.plot(unknown_trend)
     plt.show()
