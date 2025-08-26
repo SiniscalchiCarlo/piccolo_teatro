@@ -32,8 +32,11 @@ def predict_trend(known_df, target, model, last_date):
         current_day += pd.Timedelta(days=1)
         
         input_row = ts_engine.df.iloc[[-1]]
-        dmat = xgb.DMatrix(input_row)
-        prediction = model.predict(dmat)[0]
+        if isinstance(model, xgb.Booster):
+            dmat = xgb.DMatrix(input_row)
+            prediction = model.predict(dmat)[0]
+        else:
+            prediction = model.predict(input_row)[0]
         
         # Prediciton need to be always highes than the last percentage 
         prediction = max(prediction, input_row.iloc[0][target])

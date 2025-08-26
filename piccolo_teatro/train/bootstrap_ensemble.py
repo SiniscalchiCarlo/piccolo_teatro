@@ -1,4 +1,5 @@
 import os
+import scipy.stats as stats
 import random
 import json
 import glob
@@ -44,11 +45,25 @@ def get_bootstrap_df(shows_df):
     df_concat = pd.concat(sampled_dfs, ignore_index=True)
     return df_concat
 
+def get_random_params():
+    return {
+        'objective': 'reg:squarederror',
+        'learning_rate': random.uniform(0.01, 0.2),
+        'max_depth': random.choice([3, 4, 5, 6, 7]),
+        'subsample': random.uniform(0.7, 1.0),
+        'colsample_bytree': random.uniform(0.6, 1.0),
+        'min_child_weight': random.choice([1, 3, 5]),
+        'gamma': random.uniform(0, 1.0),
+        'random_state': random.randint(0, 10000),
+        'verbosity': 0
+    }
+
 def bootstrap_models(shows_df, best_params, n_bootstraps=100):
     print("Training and ensemble of models:")
     print("best parameters:",best_params)
 
-    num_boost_round = best_params.pop("n_estimators", 100)
+    num_boost_round = best_params["n_estimators"]
+    del best_params["n_estimators"]
 
     models = []
     for _ in range(n_bootstraps):
@@ -59,25 +74,13 @@ def bootstrap_models(shows_df, best_params, n_bootstraps=100):
         train_X, train_Y = separete_features_targets(df, sort=False, shuffle=False)
         dtrain = xgb.DMatrix(train_X, label=train_Y)
 
-        # print("Xtrain infos")
-        # print(train_X)
-        # print(train_X.shape)                # quante righe × quante colonne?
-        # print(train_X.columns.tolist())    # lista vera delle feature che stai passando
-        # print(train_X.nunique())           # ci sono colonne con un solo valore?
-
         # 3. Train model
         model = xgb.train(
             params=best_params,
             dtrain=dtrain,
             num_boost_round=num_boost_round,
-            #feval=multi_step_mse_eval,
             maximize=False,
-            #early_stopping_rounds=20,
-            #verbose_eval=10
         )
-
-        # booster = model.get_booster()  # se hai un XGBRegressor
-        #print("booster score", model.get_score(importance_type='gain'))
 
         models.append(model)
     return models
@@ -114,26 +117,72 @@ def get_best_params(train_shows, n_splits):
     best_params = opt.best_params_
     return best_params
 
-def test_xgb(test_shows, models, lower_q, upper_q, offset=0.4, plot=False, folder=None):
+def train_single_xgb(train_shows):
+    train_df = pd.concat(train_shows, axis=0, ignore_index=True)
+    train_df = keep_enabled_columns(train_df)
+    train_X, train_Y = separete_features_targets(train_df, sort=False, shuffle=True)
+    model = XGBRegressor(n_estimators=200,
+                         learning_rate=0.1,
+                         objective="reg:squarederror")
+    model.fit(train_X, train_Y)
+    return model
+
+def quantile_loss(alpha):
+    def qloss(y_pred, dtrain):
+        y_true = dtrain.get_label()
+        error = y_true - y_pred
+        grad = np.where(error < 0, -alpha, 1 - alpha)
+        hess = np.ones_like(y_true)  # Required by XGBoost
+        return grad, hess
+    return qloss
+
+def train_quantile_model(train_X, train_y, quantile, num_boost_round=200):
+    dtrain = xgb.DMatrix(train_X, label=train_y)
+
+    params = {
+        'max_depth': 3,
+        'eta': 0.1,
+        'subsample': 0.9,
+        'colsample_bytree': 0.9
+    }
+    model = xgb.train(
+        params=params,
+        dtrain=dtrain,
+        num_boost_round=num_boost_round,
+        obj=quantile_loss(quantile)
+    )
+
+    return model
+
+def train_quantile_regressor(train_shows, quantiles):
+    train_df = pd.concat(train_shows, axis=0, ignore_index=True)
+    train_df = keep_enabled_columns(train_df)
+    train_X, train_Y = separete_features_targets(train_df, sort=False, shuffle=True)
+    models = [] 
+    for quantile in quantiles:
+        model = train_quantile_model(train_X, train_Y, quantile)
+        models.append(model)
+    return models
+
+def test_xgb(test_shows, models, lower_q, upper_q, folder, offset=0.4, plot=False):
+    # Getting already predicted and saved shows
     saved_trends_folder = os.path.dirname(folder)
     already_saved = glob.glob(os.path.join(saved_trends_folder, "*.csv"))
     done_ids = []
     for f in already_saved:
         done_ids.append(f.split("/")[-1].replace(".csv",""))
 
-    print(done_ids)
 
-    # Iterating all the the test shows
     targets = []
     n_show = len(test_shows) 
     i_show = 0
-
     for show_df in test_shows:
         i_show +=1
         show_id = show_df["show_id"].values[0]
-        print(show_id)
-        if str(show_id) in done_ids:
-            print(show_id,"already_done")
+
+        # Skipping already predicted shows/too small
+        if str(show_id) in done_ids or int(len(show_df)* offset)<30:
+            print(show_id,"already_done or too small")
             continue
         print("Predicting shows:",i_show/n_show, i_show, n_show)
 
@@ -149,26 +198,39 @@ def test_xgb(test_shows, models, lower_q, upper_q, offset=0.4, plot=False, folde
         # Predicting the trend for each model in the ensemble
         boot_preds = []
         for model in models:
-
-            # booster = model.get_booster() if hasattr(model, "get_booster") else model
-            # plt.figure(figsize=(20, 10))
-            # xgb.plot_tree(booster, num_trees=20, rankdir="LR")
-            # plt.show()
-
             predicted_trend = predict_trend(known_df, ts_engine.target, model, show_df["last_date"][0])
             if ts_engine.target == "percentage_bought_log1p":
                 boot_preds.append(np.expm1(predicted_trend["predictions"].values))
             else:
                 boot_preds.append(predicted_trend["predictions"].values)
             index = predicted_trend.index
-
         targets.append(target["percentage_bought"].loc[index].values)
-        lower = np.percentile(boot_preds, lower_q*100, axis=0)
-        upper = np.percentile(boot_preds, upper_q*100, axis=0)
-        mean  = np.mean(boot_preds, axis=0)
+        if ts_engine.quantile_regression is False:
 
-        if folder!=None:
-            save_predicted_trends(index, target["percentage_bought"].loc[index].values, mean, lower, upper, folder+f"{show_id}.csv")
+            boot_preds = np.stack(boot_preds, axis=0)
+            # numero di bootstrap
+            B = boot_preds.shape[0]
+            
+            # stima della media predetta
+            mean = np.mean(boot_preds, axis=0)
+            # errore standard della media
+            se = np.std(boot_preds, axis=0, ddof=1)
+            # livello di confidenza (es. lower_q=0.025 e upper_q=0.975 → confidenza 95%)
+            alpha = 1 - (upper_q - lower_q)
+            df = B - 1
+            # quantile t critico
+            t_crit = stats.t.ppf(1 - alpha/2, df)
+            # calcolo dei limiti dell’intervallo di confidenza
+            lower = mean - t_crit * se
+            upper = mean + t_crit * se
+        else:
+            lower = boot_preds[0]
+            mean = boot_preds[1]
+            upper = boot_preds[2]
+
+
+        save_predicted_trends(index, target["percentage_bought"].loc[index].values, 
+                              mean, lower, upper, folder+f"{show_id}.csv")
 
 
         if plot:
@@ -178,6 +240,7 @@ def test_xgb(test_shows, models, lower_q, upper_q, offset=0.4, plot=False, folde
             plt.plot(index,upper, color="blue")
             plt.plot(index, target["percentage_bought"].loc[index], color="purple")
             plt.show()
+
 
 if __name__ == "__main__":
 
@@ -199,21 +262,29 @@ if __name__ == "__main__":
     for file in test_files:
         test_shows.append(pd.read_parquet(file))
 
-
-    best_params = load_parameters(ts_engine.pb_name) 
-    ensemble = load_ensemble(ts_engine.pb_name) 
-
-    if best_params == None:
-        best_params = get_best_params(train_shows, 5)
-        save_parameters(ts_engine.pb_name, best_params)
-
-    if ensemble == None:
-        ensemble = bootstrap_models(train_shows+validation_shows,best_params, 70)
-        save_ensemble(ts_engine.pb_name, ensemble)
-
-    
     lower_q = (1-xgb_config.ic_dim)/2
     upper_q = 1-lower_q 
+
+    if ts_engine.ensemble:
+        best_params = load_parameters(ts_engine.pb_name) 
+        ensemble = load_ensemble(ts_engine.pb_name) 
+
+        if best_params == None and ts_engine.bayes_search:
+            best_params = get_best_params(train_shows, 5)
+            save_parameters(ts_engine.pb_name, best_params)
+
+        if ensemble == None:
+            ensemble = bootstrap_models(train_shows+validation_shows,best_params, 70)
+            save_ensemble(ts_engine.pb_name, ensemble)
+    
+    if ts_engine.ensemble == False:
+        model = train_single_xgb(train_shows+validation_shows)
+        ensemble = [model]
+
+    if ts_engine.quantile_regression:
+        ensemble = train_quantile_regressor(train_shows+validation_shows, quantiles=[lower_q, 0.5, upper_q])
+
+    
  
     # Creating a folder for storing predictions and metrics about the model
     save_folder = path+f"/{ts_engine.pb_name}/"
@@ -229,9 +300,11 @@ if __name__ == "__main__":
             shows = test_shows
         if set_name=="train_validation":
             shows = train_shows + validation_shows
+
         # Getting predictions for test shows
         test_xgb(shows, ensemble, lower_q, upper_q, 
-                 plot=False, folder=save_folder+f"/{set_name}/")
+                 folder=save_folder+f"/{set_name}/",
+                 plot=False, )
 
         # Evaluating Metrics    
         ts_metrics = TimeSeriesMetrics(save_folder+f"/{set_name}/", lower_q, upper_q)

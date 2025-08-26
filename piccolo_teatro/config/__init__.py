@@ -4,28 +4,15 @@ import pandas as pd
 from skopt.space import Real, Integer
 
 class XGBConfig(BaseModel):
-    parameters: dict = {
-        "eta": 0.3,               # learning rate
-        "max_depth": 6,           # maximum tree depth
-        "min_child_weight": 1,    # minimum sum Hessian in a leaf
-        "gamma": 0,               # minimum loss reduction for a split
-        "subsample": 1,           # row subsampling ratio
-        "colsample_bytree": 1,    # feature subsampling ratio per tree
-        "lambda": 1,              # L2 regularization term
-        "alpha": 0,               # L1 regularization term
-    }
 
     param_space: dict = {
-        'n_estimators': Integer(50, 500),
-        'max_depth': Integer(3, 12),
-        'learning_rate': Real(1e-3, 1e-1, prior='log-uniform'),
+        'n_estimators': Integer(100, 300),
+        'max_depth': Integer(3, 10),
+        'learning_rate': Real(0.01, 0.3, prior='log-uniform'),
         'subsample': Real(0.5, 1.0),
-        'colsample_bytree': Real(0.5, 1.0),
-        'gamma': Real(0, 5),
-        'reg_alpha': Real(1e-8, 1.0, prior='log-uniform'),
-        'reg_lambda': Real(1e-8, 1.0, prior='log-uniform')
-    }
-    
+        'colsample_bytree': Real(0.5, 1.0)
+    }    
+
     ic_dim: confloat(ge=0.0, le=1.0) = 0.9
 
 
@@ -38,7 +25,10 @@ class Feature(BaseModel):
 class ProblemConfig(BaseModel):
     periods: List[int] = [2, 4, 6, 8, 10, 15, 20, 30]
     target: Literal["percentage_bought", "percentage_bought_delta", "percentage_bought_log1p"]
-    pb_name: str = "xgb_log"
+    pb_name: str = "xgb_log_ic"
+    ensemble: bool = True 
+    bayes_search: bool = True
+    quantile_regression: bool = False 
 
 
 problem_config = ProblemConfig(target = "percentage_bought_log1p")
@@ -49,6 +39,9 @@ class TimeSeriesEngine:
         self.periods = problem_config.periods
         self.target = problem_config.target
         self.pb_name = problem_config.pb_name
+        self.ensemble = problem_config.ensemble
+        self.bayes_search = problem_config.bayes_search
+        self.quantile_regression = problem_config.quantile_regression
 
         self.encoding_dict = {
             "show_type": ['Internazionale', 'Ospitalità', 'Collaborazione', 'Produzione', 'Festival'],

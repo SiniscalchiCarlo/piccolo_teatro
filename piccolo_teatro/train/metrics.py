@@ -9,8 +9,6 @@ class TimeSeriesMetrics:
       - MSE
       - MAE
       - PICP (Prediction Interval Coverage Probability)
-      - DTW Shape-Based Distance
-      - Shift-Invariant Shape-Based Distance
       - Interval Score
 
     Inputs:
