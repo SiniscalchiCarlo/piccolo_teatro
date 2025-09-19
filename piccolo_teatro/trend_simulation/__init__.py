@@ -3,7 +3,7 @@ from time import time
 import pandas as pd
 import matplotlib.pyplot as plt
 from ..train import keep_enabled_columns, separete_features_targets
-from ..config import TimeSeriesEngine 
+from ..config import TimeSeriesEngine
 import xgboost as xgb
 
 pd.set_option("display.max_columns", None)
@@ -24,27 +24,29 @@ def predict_trend(known_df, target, model, last_date):
     predictions = []
     predicitons_days = []
     
-    # Keep iterating until we predict the last day (day of the last performance of the show)
-    n_predictions = df["sales_duration"].iloc[0]-len(known_df)   
+    # Iterate until predictions reach the day before the final performance.
+    n_predictions = df["sales_duration"].iloc[0]-len(known_df)
 
     last_date = last_date-pd.Timedelta(days=1)
     while(current_day<last_date):
         current_day += pd.Timedelta(days=1)
-        
+
         input_row = ts_engine.df.iloc[[-1]]
         if isinstance(model, xgb.Booster):
             dmat = xgb.DMatrix(input_row)
             prediction = model.predict(dmat)[0]
         else:
             prediction = model.predict(input_row)[0]
-        
-        # Prediciton need to be always highes than the last percentage 
+
+        # Ensure the cumulative prediction never decreases relative to the
+        # latest known percentage.
         prediction = max(prediction, input_row.iloc[0][target])
 
         predictions.append(prediction)
         predicitons_days.append(current_day)
 
-        # Updating all the features with the new prediction
+        # Update the rolling feature set with the freshly predicted value so
+        # that the next iteration has an extended history.
         ts_engine.update_features(prediction)
 
     prediction_df = pd.DataFrame({"predictions": predictions}, index=predicitons_days)

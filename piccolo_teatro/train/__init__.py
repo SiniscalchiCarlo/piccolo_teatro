@@ -16,7 +16,8 @@ def separete_features_targets(df, sort=False, shuffle=False):
     if sort and shuffle:
         raise Exception("You can't both shuffle and sort, please choose one")
     
-    # Convert date column to datetime"
+    # Convert the 'date' column to datetime so temporal ordering can be
+    # enforced consistently.
     df.loc[:, "date"] = pd.to_datetime(df["date"], format='%d/%m/%Y')
     df = df.set_index("date")
 
@@ -36,7 +37,8 @@ def keep_enabled_columns(df):
     """
     Keeps only the enabled features and the target column
     """
-    # Removing not needed features
+    # Remove any feature groups that are currently disabled in the
+    # TimeSeriesEngine configuration.
     features = ts_engine.enabled_features
     target_col = f"TARGET_{ts_engine.target}"
     columns_to_keep = ["date", target_col]
@@ -47,6 +49,7 @@ def keep_enabled_columns(df):
     return df
 
 def abs_error(model, X, Y):
+        # Plot residuals and print the overall MAE to diagnose model fit.
         train_prediciton = model.predict(X)
         train_mae = mean_absolute_error(Y, train_prediciton)
         plt.plot(Y-X["percentage_bought"], "ro")

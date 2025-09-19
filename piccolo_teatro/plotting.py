@@ -5,12 +5,14 @@ import pandas as pd
 import glob
 import os
 
+# Interactive helper to visualise random prediction intervals alongside the
+# true target curves for quick qualitative inspection.
 files = glob.glob(os.path.join("/home/carlo/Data/dati_piccolo_teatro2/xgb_log_ic_1/test", "*.csv"))
 metrics = pd.read_csv("/home/carlo/Data/dati_piccolo_teatro2/xgb_log/test_metrics.csv")
 while True:
     fig, axes = plt.subplots(3, 3, figsize=(12, 12))
     axes_flat = axes.flatten()
-    
+
     selected = 0
     plotted = []
     print(len(axes_flat))

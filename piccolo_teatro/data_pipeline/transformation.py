@@ -15,6 +15,7 @@ path = os.environ.get("FOLDER_PATH")
 encoding_dict = ts_engine.encoding_dict
 
 def get_season_dates(seasons_df, season_id: str):
+    # Look up the sales window for the specified season.
     season_row = seasons_df[seasons_df["season_id"] == season_id]
     start_date = season_row["inizio_vendite"].iloc[0]
     end_date = season_row["fine_vendite"].iloc[0]
@@ -53,6 +54,8 @@ def add_show_info(products_df, df, show_id):
     year2 = "20" + preformance_season.split(' ')[1].split('/')[1]
     performances_same_show = performances_same_show.copy()
     
+    # Convert the textual representation of the performance day into a
+    # concrete datetime, handling Italian weekday abbreviations when present.
     if performances_same_show['performance_day'].iloc[0].split(" ")[0] in ["lun", "mar", "mer", "gio", "ven", "sab", "dom"]:
         performances_same_show.loc[:, 'performance_date'] = performances_same_show['performance_day'].apply(lambda x: get_day_month(x, year1, year2))
         performances_same_show.loc[:, "performance_date"] = pd.to_datetime(performances_same_show["performance_date"], format='%d/%m/%Y')
@@ -65,11 +68,14 @@ def add_show_info(products_df, df, show_id):
     # Get all the performances of the same show
     performances_same_show = products_df[products_df["show_id"]==show_id].copy()
 
+    # Ignore auxiliary performances and venues that are outside the modelling
+    # scope.
     performances_to_not_consider = [
         "Evento collaterale",
         "Altro",
         "Spettacolo per bambini e ragazzi",
     ]
+    # Restrict the venues to the main theatres considered in the analysis.
     spaces_to_consider = [
         "Teatro Studio Melato",
         "Teatro Strehler",
@@ -119,37 +125,39 @@ def add_features(seasons: Seasons, products: Products, df: pd.DataFrame, live_da
             else:
                 fill_date = df["last_date"].iloc[0]
 
-            # Aggiungo i dati dei giorni mancanti (giorni senza vendite), li riempio mettendo l'ultimo valore noto
+            # Insert any missing days (dates without sales) and forward-fill
+            # them using the most recent known values.
             date_range = pd.date_range(start=df["date"].min(), end=fill_date)
             df = df.set_index("date").reindex(date_range, method="ffill")
             df["date"] = df.index
 
-        
-            # Distanza della transazione dall'inizio e dalla fine della stagione
+
+            # Compute distances from the start/end of the season and overall
+            # sales progress.
             df["start_sales_distance"] = (df["date"]-start_date).dt.days.abs()
             df["end_season_distance"] = (df["date"]-end_date).dt.days.abs()
             df["sales_duration"] = (df["last_date"]-start_date).dt.days
             df["end_sales_distance"] = (df["last_date"]-df["date"]).dt.days
             df["percentage_sales_day"] = df["start_sales_distance"]/(df["last_date"]-start_date).dt.days
             df["percentage_sales_day"] = df["percentage_sales_day"]
-        
-        
-            # Numero biglietti rimanenti per raggiungere capienza massima
+
+
+            # Track remaining inventory and sales-derived percentages.
             df["remaining_tickets"] = df["show_capacity"]-df["tickets_cum_sum"]
             df["percentage_bought"] = df["tickets_cum_sum"]/df["show_capacity"]
             df["percentage_bought_delta"] = df["percentage_bought"].diff(periods=1)
 
-            
+
             df = add_log_transform(df, "percentage_bought")
 
             df = add_deltas(df, ["percentage_bought", "percentage_bought_log1p"], [2,4,6,8,10,15,20,30])
-            # Aggiungo medie mobili con differenti periodi
+            # Add moving averages for several rolling windows.
             df = add_moving_avarages(df, ["percentage_bought_delta", "gain_cum_sum", "tickets_cum_sum", "percentage_bought","percentage_bought_log1p"], [2,4,6,8,10,15,20,30])
 
-            # Aggiungo valori shiftati
+            # Add lagged versions of the selected features.
             df = add_shifted_values(df, ["percentage_bought_delta", "gain_cum_sum", "tickets_cum_sum", "percentage_bought","percentage_bought_log1p"], [2,4,6,8,10,15,20,30])
-            
-            # Aggiungo i possibili target da prevedere:
+
+            # Generate all potential target columns needed for training.
             df = add_targets(df, ["percentage_bought", "percentage_bought_log1p", "percentage_bought_delta"])
             
         else:

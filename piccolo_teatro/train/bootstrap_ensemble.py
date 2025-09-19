@@ -25,12 +25,16 @@ from piccolo_teatro.train import keep_enabled_columns, separete_features_targets
 from piccolo_teatro.train.metrics import TimeSeriesMetrics
 from piccolo_teatro.trend_simulation import predict_trend
 
+# End-to-end training routine for fitting a bootstrap ensemble of XGBoost
+# models and evaluating their time-series forecasts.
 xgb_config = XGBConfig()
 load_dotenv(find_dotenv())
 path = os.getenv("FOLDER_PATH")
 
 
 def save_predicted_trends(index, target, mean, low, up, file_path):
+    # Persist the predicted intervals alongside the true values for a single
+    # show.
     df = pd.DataFrame({"lower": low, "upper": up, "mean": mean, "target": target})
     df.index = index
 
@@ -42,6 +46,7 @@ def save_predicted_trends(index, target, mean, low, up, file_path):
 
 
 def get_bootstrap_df(shows_df):
+    # Sample shows with replacement to build a bootstrap training dataset.
     sampled_dfs = random.choices(shows_df, k=len(shows_df))
     df_concat = pd.concat(sampled_dfs, ignore_index=True)
     return df_concat
@@ -63,7 +68,7 @@ def bootstrap_models(shows_df, best_params, n_bootstraps=100):
         train_X, train_Y = separete_features_targets(df, sort=False, shuffle=False)
         dtrain = xgb.DMatrix(train_X, label=train_Y)
 
-        # 3. Train model
+        # Train a booster on the sampled dataset.
         model = xgb.train(
             params=best_params,
             dtrain=dtrain,
@@ -76,6 +81,8 @@ def bootstrap_models(shows_df, best_params, n_bootstraps=100):
 
 
 def get_best_params(train_shows, n_splits):
+    # Aggregate all shows and run Bayesian optimisation with group-aware
+    # cross-validation to estimate robust hyperparameters.
     train_df = pd.concat(train_shows, axis=0, ignore_index=True)
     groups = train_df["show_id"].copy()
     train_df = keep_enabled_columns(train_df)
@@ -105,7 +112,8 @@ def get_best_params(train_shows, n_splits):
 
 
 def test_xgb(test_shows, models, lower_q, upper_q, folder, offset=0.4, plot=False):
-    # Getting already predicted and saved shows
+    # Identify shows that already have stored predictions to avoid recomputing
+    # them.
     saved_trends_folder = os.path.dirname(folder)
     already_saved = glob.glob(os.path.join(saved_trends_folder, "*.csv"))
     done_ids = []
@@ -119,21 +127,22 @@ def test_xgb(test_shows, models, lower_q, upper_q, folder, offset=0.4, plot=Fals
         i_show += 1
         show_id = show_df["show_id"].values[0]
 
-        # Skipping already predicted shows/too small
+        # Skip shows with existing predictions or very short histories.
         if str(show_id) in done_ids or int(len(show_df) * offset) < 30:
             print(show_id, "already_done or too small")
             continue
         print("Predicting shows:", i_show / n_show, i_show, n_show)
 
-        # Calculating target df which is the real trend line we want to predict
+        # Build the ground-truth trend we compare predictions against.
         target = show_df[["date", "percentage_bought"]].copy()
         target["date"] = pd.to_datetime(target["date"], format="%d/%m/%Y")
         target.set_index("date", inplace=True)
 
-        # getting only the first "offset" part of the dataset so we can predict the rest of the trend line
+        # Keep only the first "offset" portion of the series as the known
+        # context for forecasting the remaining days.
         known_df = show_df.head(int(len(show_df) * offset)).copy()
 
-        # Predicting the trend for each model in the ensemble
+        # Predict the remaining trajectory using every model in the ensemble.
         boot_preds = []
         for model in models:
             predicted_trend = predict_trend(
@@ -148,19 +157,20 @@ def test_xgb(test_shows, models, lower_q, upper_q, folder, offset=0.4, plot=Fals
         if ts_engine.quantile_regression is False:
 
             boot_preds = np.stack(boot_preds, axis=0)
-            # numero di bootstrap
+            # Number of bootstrap samples.
             B = boot_preds.shape[0]
 
-            # stima della media predetta
+            # Estimated mean prediction.
             mean = np.mean(boot_preds, axis=0)
-            # errore standard della media
+            # Standard error of the mean.
             se = np.std(boot_preds, axis=0, ddof=1)
-            # livello di confidenza (es. lower_q=0.025 e upper_q=0.975 → confidenza 95%)
+            # Desired confidence level (e.g., lower_q=0.025 and upper_q=0.975
+            # corresponds to 95%).
             alpha = 1 - (upper_q - lower_q)
             df = B - 1
-            # quantile t critico
+            # Critical t-quantile.
             t_crit = stats.t.ppf(1 - alpha / 2, df)
-            # calcolo dei limiti dell’intervallo di confidenza
+            # Compute the confidence interval bounds.
             lower = mean - t_crit * se
             upper = mean + t_crit * se
         else:
@@ -221,7 +231,7 @@ if __name__ == "__main__":
         save_ensemble(ts_engine.pb_name, ensemble)
 
 
-    # Creating a folder for storing predictions and metrics about the model
+    # Create the directory layout that will host predictions and metrics.
     save_folder = path + f"/{ts_engine.pb_name}/"
     if not os.path.isdir(save_folder):
         os.makedirs(save_folder)
@@ -235,7 +245,7 @@ if __name__ == "__main__":
         if set_name == "train_validation":
             shows = train_shows + validation_shows
 
-        # Getting predictions for test shows
+        # Generate predictions for all selected shows.
         test_xgb(
             shows,
             ensemble,
@@ -245,7 +255,7 @@ if __name__ == "__main__":
             plot=False,
         )
 
-        # Evaluating Metrics
+        # Evaluate and persist aggregated metrics for this dataset split.
         ts_metrics = TimeSeriesMetrics(save_folder + f"/{set_name}/", lower_q, upper_q)
         res = ts_metrics.evaluate([5, 10, 15, 20, 25, 30], save_folder, set_name)
         print(f"\nMetrics summart of {set_name} set:")

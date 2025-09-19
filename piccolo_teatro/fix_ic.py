@@ -4,6 +4,8 @@ import numpy as np
 import glob
 import os
 
+# Rescale saved confidence intervals to adjust their width while preserving
+# the central prediction.
 folder = "/home/carlo/Data/dati_piccolo_teatro2/xgb_log_ic_1/train_validation"
 files = glob.glob(os.path.join(folder, "*.csv"))
 

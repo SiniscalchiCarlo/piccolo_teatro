@@ -7,6 +7,8 @@ import matplotlib.pyplot as plt
 import matplotlib.style as style
 import plotly.graph_objects as go
 
+# Toolkit used by the Power BI integration to prepare show data, generate
+# forecasts, and visualise the resulting trends.
 ts_engine = TimeSeriesEngine()
 
 sales_cols = [
@@ -69,7 +71,8 @@ def rename_cols(dataset):
 
 def plot_trends(static, product_name, known_gain, known_trend, future_prediction, predicted_fixed_trend, scale_factor):
     if static:
-        
+
+        # Draw a static Matplotlib chart comparing known data and forecasts.
         plt.plot(future_prediction*scale_factor, color="orange", label="Future Prediction")
         plt.plot(known_trend*scale_factor, color="blue", label="Known Trend")
         if scale_factor != 1:
@@ -87,9 +90,10 @@ def plot_trends(static, product_name, known_gain, known_trend, future_prediction
         plt.show()
     else:
         fig = go.Figure()
+        # Build an interactive Plotly visual with the same layers.
         fig.add_trace(go.Scatter(x=future_prediction.index, y=future_prediction["predictions"]*scale_factor, mode='lines', name='Future Prediction', line=dict(width=4)))
         fig.add_trace(go.Scatter(x=known_trend.index, y=known_trend*scale_factor, mode='lines', name='Known Trend', line=dict(width=4)))
-        
+
         if scale_factor != 1:
             fig.add_trace(go.Scatter(x=future_prediction.index, y=known_gain, mode='lines', name='Future Prediction', line=dict(width=4)))
 
@@ -122,7 +126,7 @@ def powerbi_visual(dataset, offset, static = True, gain_trend = False):
 
     SALES, PRODUCTS, SEASONS = rename_cols(dataset)
 
-    # Get show info
+    # Extract show-level targets and metadata from the Power BI dataset.
     show_id = int(dataset["T_PRODUCT_ID"].iloc[0])
     target_perc = float(dataset["OBIETTIVO RIEMPIMENTO"].iloc[0])
     target_gain = float(dataset["OBIETTIVO INCASSO"].iloc[0])
@@ -131,7 +135,8 @@ def powerbi_visual(dataset, offset, static = True, gain_trend = False):
     product_name = dataset["PRODUCT_EXTERNAL_NAME"].iloc[-1]
 
     
-    # From raw data we run a pipelan that cleans them and adds features
+    # Run the preprocessing pipeline on the raw data to engineer the required
+    # features for forecasting.
     df = run_data_pipeline(SALES, PRODUCTS, SEASONS, show_id)
     sales_duration = df["sales_duration"].iloc[0]
     known_trend = df["percentage_bought"].copy()
@@ -143,13 +148,14 @@ def powerbi_visual(dataset, offset, static = True, gain_trend = False):
         scale_factor = capacity * (avg_ticket_price)
 
 
-    # Make prediction using all the known data
+    # Generate a full-trend prediction using all available observations.
     model = get_model("XGB_trend2")
     future_prediction = predict_trend(df, model)
     known_trend = known_trend.rename("predictions")
-    known_and_predicted = pd.concat([known_trend, future_prediction])    
+    known_and_predicted = pd.concat([known_trend, future_prediction])
 
-    # Generate fixed trend prediction if there is enoght data
+    # Optionally create a prediction that only uses the initial portion of the
+    # sales history to mimic an early forecast.
     predicted_fixed_trend = []
     if int(sales_duration * offset) <= len(df):
         fixed_df = df.head(int(sales_duration * offset)).copy()

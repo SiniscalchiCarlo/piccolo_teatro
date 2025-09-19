@@ -2,9 +2,11 @@ from pydantic import BaseModel
 from typing import List, Dict, Callable
 import pandas as pd
 
+
 class Sales():
     def __init__(self, initial_df):
-        # Dictionary mapping original column names to desired names
+        # Dictionary mapping original column names to standardized names used
+        # throughout the project.
         self.sales_cols = {
             "D_SALES_LIST_SALES_Individuali_Gruppi": "individuali_gruppi",
             "D_SALES_LIST_SALES_Tipologia_canale": "online_offline",
@@ -37,7 +39,7 @@ class Sales():
         self.rename_cols()
 
     def rename_cols(self):
-        # Some columns have a space before the name, we need to remove it:
+        # Some columns contain a leading space; strip it before renaming.
         self.df = self.df.rename(columns=lambda x: x.lstrip())
         self.df = self.df.rename(columns=self.sales_cols)
 
@@ -74,11 +76,11 @@ class Sales():
         self.df["date"] = pd.to_datetime(self.df["date"], errors='coerce')
 
     def clean_cols(self):
-        # keep only the coulmns needed
+        # Keep only the columns required for downstream processing.
         self.df = self.df[list(self.cols_too_keep)]
 
     def clean_rows(self):
-        
+
         self.df['season_id'] = self.df['season_id'].astype(int)
 
         # Exclude sales from specified seasons
@@ -88,11 +90,11 @@ class Sales():
         self.df = self.df[self.df['operation_kind'].isin(
             self.operations_to_keep)]
         
-        # considering only sales operations
+        # Consider only sale operations.
         self.df = self.df[self.df['operation_type'] == "Venduti"]
-    
+
     def assign_index(self):
-        self.df = self.df.set_index('date', drop=False) 
+        self.df = self.df.set_index('date', drop=False)
 
     def sort_values(self):
         self.df = self.df.sort_values('date')
@@ -108,6 +110,7 @@ class Sales():
         return self.df.groupby('show_id')
     
     def clean(self):
+        # Apply type casting, row filtering, and column pruning in sequence.
         self.assign_types()
         self.clean_rows()
         self.clean_cols()
@@ -115,6 +118,8 @@ class Sales():
 
 class Products():
     def __init__(self, initial_df):
+        # Rename raw product columns so the feature engineering pipeline can
+        # reference them consistently.
         self.products_cols = {
             "D_CONFIG_PROD_LIST_T_PRODUCT_ID": "show_id",
             "D_CONFIG_PROD_LIST_PERFORMANCE_STATE": "performance_state",
@@ -144,11 +149,13 @@ class Products():
             "max_tickets":int,})
         
     def clean(self):
+        # Apply the column renaming and type conversions on the product data.
         self.assign_types()
 
 class Seasons():
 
     def __init__(self, initial_df):
+        # Mapping for the season metadata columns.
         self.seasons_cols = {
             "season_id": "season_id",
             "season_name": "season_name",
@@ -178,4 +185,5 @@ class Seasons():
         self.df["fine_stagione"] = pd.to_datetime(self.df["fine_stagione"], errors='coerce')
         
     def clean(self):
+        # Convert season metadata columns to their appropriate dtypes.
         self.assign_types()

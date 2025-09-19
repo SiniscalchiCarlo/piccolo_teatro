@@ -5,18 +5,24 @@ from skopt.space import Real, Integer
 
 class XGBConfig(BaseModel):
 
+    # Hyperparameter search space explored during Bayesian optimization for
+    # the XGBoost regressor.
     param_space: dict = {
         'n_estimators': Integer(100, 300),
         'max_depth': Integer(3, 10),
         'learning_rate': Real(0.01, 0.3, prior='log-uniform'),
         'subsample': Real(0.5, 1.0),
         'colsample_bytree': Real(0.5, 1.0)
-    }    
+    }
 
+    # Minimum Information Coefficient threshold used when evaluating
+    # predictions.
     ic_dim: confloat(ge=0.0, le=1.0) = 0.9
 
 
 class Feature(BaseModel):
+    # Metadata describing a single engineered feature or a group of related
+    # feature columns.
     columns: List[str]
     const: bool
     enabled: bool
@@ -34,6 +40,8 @@ class ProblemConfig(BaseModel):
 problem_config = ProblemConfig(target = "percentage_bought_log1p")
 class TimeSeriesEngine:
     def __init__(self, df=None):
+        # Store the dataset and propagate configuration defaults so that the
+        # engine knows which features and target to manage.
         self.df = df
         self.new_prediction = None
         self.periods = problem_config.periods
@@ -82,9 +90,10 @@ class TimeSeriesEngine:
                                                             const=True,
                                                             enabled=True,
                                                             update=self.__update_const)
-        
 
-        # Variables features
+
+        # Variable features that evolve over time as new predictions are
+        # generated.
         self.start_sales_distance: Feature = Feature(columns=["start_sales_distance"],
                                                             const=False,
                                                             enabled=True,
@@ -120,8 +129,9 @@ class TimeSeriesEngine:
                                                 const=False,
                                                 enabled=True,
                                                 update=self.__update_target)
-        
-        # Calling functions that generate multiple features (es. moving avg of multiple periods)
+
+        # Calling helper functions that generate families of time-based
+        # features (e.g., moving averages across multiple periods).
         self.__init_target_avg(enabled=True)
 
         self.__init_target_delta(enabled=True)
@@ -133,6 +143,8 @@ class TimeSeriesEngine:
     def update_features(self, prediction):
         if self.df is None:
             raise Exception("Please add a input df to Feature class before calling update_features")
+        # Store the predicted target value and reset the container for the
+        # synthetic row that will be appended to the dataset.
         self.new_prediction = prediction
         self.new_row = {}
 
@@ -144,6 +156,8 @@ class TimeSeriesEngine:
             update_function = feature.update
             update_function(feature.columns[0])
 
+        # Append the constructed feature row so future predictions can build
+        # on the extended history.
         self.new_row = pd.DataFrame(self.new_row)
         self.df = pd.concat([self.df, self.new_row], ignore_index=True)
 
@@ -200,11 +214,11 @@ class TimeSeriesEngine:
         self.new_row[f"{self.target}"] = [self.new_prediction]
 
     def __update_target_avg(self):
-        # concateno storico + nuova predizione
+        # Concatenate the historical target values with the latest prediction.
         values = self.df[f"{self.target}"].tolist() + [self.new_prediction]
         s = pd.Series(values)
         for period in self.periods:
-            # rolling mean e prendo solo l'ultimo
+            # Compute the rolling mean and keep only the latest value.
             avg_val = s.rolling(period).mean().iloc[-1]
             self.new_row[f"{self.target}_avg_{period}"] = avg_val
 
@@ -212,7 +226,7 @@ class TimeSeriesEngine:
         values = self.df[f"{self.target}"].tolist() + [self.new_prediction]
         s = pd.Series(values)
         for period in self.periods:
-            # differenza tra t e t-period
+            # Difference between the current value and the value at t - period.
             delta_val = s.diff(periods=period).iloc[-1]
             self.new_row[f"{self.target}_delta_{period}"] = delta_val
 
@@ -221,7 +235,7 @@ class TimeSeriesEngine:
         s = pd.Series(values)
         first_val = s.iloc[0]
         for period in self.periods:
-            # shift e fill dei NaN con il primo valore
+            # Shift the series and fill missing values with the initial value.
             shifted_val = s.shift(period).fillna(first_val).iloc[-1]
             self.new_row[f"{self.target}_shifted_{period}"] = shifted_val
 

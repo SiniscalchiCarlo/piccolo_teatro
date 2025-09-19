@@ -1,7 +1,8 @@
 import pandas as pd
 import re
 
-# Load the CSV
+# Utility script that converts a wide CSV file into multiple LaTeX tables that
+# each display eight columns at a time.
 df = pd.read_csv('/home/carlo/Data/dati_piccolo_teatro2/xgb_log_ic_1/train_validation_summary.csv')
 df.rename(columns=lambda col: re.sub(r'IntervalScore_(\w+)', r'IS_\1', col), inplace=True)
 # Split columns into chunks of 8, padding the last if necessary

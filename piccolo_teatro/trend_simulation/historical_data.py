@@ -11,6 +11,7 @@ from . import predict_trend
 pd.set_option("display.max_columns", None)
 load_dotenv(find_dotenv())
 path = os.environ.get("FOLDER_PATH")
+# Load the pre-trained model used to simulate historical forecasts.
 model = pickle.load(open(r"C:\Users\39370\Desktop\piccolo_teatro\piccolo_teatro\models\XGB_trend2.pkl", "rb"))
 
 offset = 0.1
@@ -29,13 +30,14 @@ for show_id in ids:
     df = run_data_pipeline(SALES, PRODUCTS, SEASONS, show_id)
     print(df)
     print("len df", len(df))
-    # We are simulationg we don't know all the data
+    # Simulate limited visibility by only exposing the first portion of the
+    # sales history.
     unknown_trend = df["percentage_bought"].copy()
     known_df = df.head(int(len(df) * offset)).copy()
 
     predicted_trend = predict_trend(known_df, model)
 
-    # Plotting
+    # Plot the predicted versus actual cumulative sales trends.
     plt.plot(predicted_trend)
     plt.show()
     plt.plot(unknown_trend)
