@@ -1,37 +1,37 @@
-import os
-import scipy.stats as stats
-import random
-import json
 import glob
-from dotenv import load_dotenv, find_dotenv
-from piccolo_teatro import train
+import os
+import random
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import scipy.stats as stats
+import xgboost as xgb
+from dotenv import find_dotenv, load_dotenv
+from sklearn.model_selection import GroupKFold
+from skopt import BayesSearchCV
+from skopt.callbacks import DeltaYStopper
+from xgboost import XGBRegressor
+
+from piccolo_teatro import ts_engine
 from piccolo_teatro.config import XGBConfig
-from piccolo_teatro.models import load_ensemble, load_parameters, save_ensemble, save_parameters
+from piccolo_teatro.models import (
+    load_ensemble,
+    load_parameters,
+    save_ensemble,
+    save_parameters,
+)
 from piccolo_teatro.train import keep_enabled_columns, separete_features_targets
 from piccolo_teatro.train.metrics import TimeSeriesMetrics
 from piccolo_teatro.trend_simulation import predict_trend
-from piccolo_teatro import ts_engine
-import xgboost as xgb
-from xgboost import XGBRegressor
-from skopt import BayesSearchCV
-from skopt.callbacks import DeltaYStopper
-from sklearn.model_selection import GroupKFold, TimeSeriesSplit
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
 
-xgb_config =  XGBConfig()
+xgb_config = XGBConfig()
 load_dotenv(find_dotenv())
 path = os.getenv("FOLDER_PATH")
 
 
 def save_predicted_trends(index, target, mean, low, up, file_path):
-    df = pd.DataFrame({
-        'lower': low,
-        'upper': up,
-        'mean': mean,
-        'target': target
-    })
+    df = pd.DataFrame({"lower": low, "upper": up, "mean": mean, "target": target})
     df.index = index
 
     folder_path = os.path.dirname(file_path)
@@ -40,35 +40,24 @@ def save_predicted_trends(index, target, mean, low, up, file_path):
 
     df.to_csv(file_path, index=False)
 
+
 def get_bootstrap_df(shows_df):
     sampled_dfs = random.choices(shows_df, k=len(shows_df))
     df_concat = pd.concat(sampled_dfs, ignore_index=True)
     return df_concat
 
-def get_random_params():
-    return {
-        'objective': 'reg:squarederror',
-        'learning_rate': random.uniform(0.01, 0.2),
-        'max_depth': random.choice([3, 4, 5, 6, 7]),
-        'subsample': random.uniform(0.7, 1.0),
-        'colsample_bytree': random.uniform(0.6, 1.0),
-        'min_child_weight': random.choice([1, 3, 5]),
-        'gamma': random.uniform(0, 1.0),
-        'random_state': random.randint(0, 10000),
-        'verbosity': 0
-    }
 
 def bootstrap_models(shows_df, best_params, n_bootstraps=100):
     print("Training and ensemble of models:")
-    print("best parameters:",best_params)
+    print("best parameters:", best_params)
 
     num_boost_round = best_params["n_estimators"]
     del best_params["n_estimators"]
 
     models = []
     for _ in range(n_bootstraps):
-        print("%trained models:",_/n_bootstraps)
-        df = get_bootstrap_df(shows_df)        
+        print("%trained models:", _ / n_bootstraps)
+        df = get_bootstrap_df(shows_df)
         df = keep_enabled_columns(df)
 
         train_X, train_Y = separete_features_targets(df, sort=False, shuffle=False)
@@ -85,6 +74,7 @@ def bootstrap_models(shows_df, best_params, n_bootstraps=100):
         models.append(model)
     return models
 
+
 def get_best_params(train_shows, n_splits):
     train_df = pd.concat(train_shows, axis=0, ignore_index=True)
     groups = train_df["show_id"].copy()
@@ -92,10 +82,7 @@ def get_best_params(train_shows, n_splits):
     train_X, train_Y = separete_features_targets(train_df, sort=False, shuffle=True)
 
     xgb = XGBRegressor(
-        objective='reg:squarederror',
-        random_state=42,
-        tree_method='hist',
-        verbosity=0
+        objective="reg:squarederror", random_state=42, tree_method="hist", verbosity=0
     )
 
     cv = GroupKFold(n_splits=n_splits)
@@ -104,65 +91,18 @@ def get_best_params(train_shows, n_splits):
     opt = BayesSearchCV(
         estimator=xgb,
         search_spaces=xgb_config.param_space,
-        scoring='neg_root_mean_squared_error',
+        scoring="neg_root_mean_squared_error",
         cv=cv,
         n_iter=100,
         n_jobs=-1,
         random_state=42,
-        verbose=1
+        verbose=1,
     )
 
-
-    opt.fit(train_X, train_Y, groups=groups,callback=[stopper])
+    opt.fit(train_X, train_Y, groups=groups, callback=[stopper])
     best_params = opt.best_params_
     return best_params
 
-def train_single_xgb(train_shows):
-    train_df = pd.concat(train_shows, axis=0, ignore_index=True)
-    train_df = keep_enabled_columns(train_df)
-    train_X, train_Y = separete_features_targets(train_df, sort=False, shuffle=True)
-    model = XGBRegressor(n_estimators=200,
-                         learning_rate=0.1,
-                         objective="reg:squarederror")
-    model.fit(train_X, train_Y)
-    return model
-
-def quantile_loss(alpha):
-    def qloss(y_pred, dtrain):
-        y_true = dtrain.get_label()
-        error = y_true - y_pred
-        grad = np.where(error < 0, -alpha, 1 - alpha)
-        hess = np.ones_like(y_true)  # Required by XGBoost
-        return grad, hess
-    return qloss
-
-def train_quantile_model(train_X, train_y, quantile, num_boost_round=200):
-    dtrain = xgb.DMatrix(train_X, label=train_y)
-
-    params = {
-        'max_depth': 3,
-        'eta': 0.1,
-        'subsample': 0.9,
-        'colsample_bytree': 0.9
-    }
-    model = xgb.train(
-        params=params,
-        dtrain=dtrain,
-        num_boost_round=num_boost_round,
-        obj=quantile_loss(quantile)
-    )
-
-    return model
-
-def train_quantile_regressor(train_shows, quantiles):
-    train_df = pd.concat(train_shows, axis=0, ignore_index=True)
-    train_df = keep_enabled_columns(train_df)
-    train_X, train_Y = separete_features_targets(train_df, sort=False, shuffle=True)
-    models = [] 
-    for quantile in quantiles:
-        model = train_quantile_model(train_X, train_Y, quantile)
-        models.append(model)
-    return models
 
 def test_xgb(test_shows, models, lower_q, upper_q, folder, offset=0.4, plot=False):
     # Getting already predicted and saved shows
@@ -170,35 +110,35 @@ def test_xgb(test_shows, models, lower_q, upper_q, folder, offset=0.4, plot=Fals
     already_saved = glob.glob(os.path.join(saved_trends_folder, "*.csv"))
     done_ids = []
     for f in already_saved:
-        done_ids.append(f.split("/")[-1].replace(".csv",""))
-
+        done_ids.append(f.split("/")[-1].replace(".csv", ""))
 
     targets = []
-    n_show = len(test_shows) 
+    n_show = len(test_shows)
     i_show = 0
     for show_df in test_shows:
-        i_show +=1
+        i_show += 1
         show_id = show_df["show_id"].values[0]
 
         # Skipping already predicted shows/too small
-        if str(show_id) in done_ids or int(len(show_df)* offset)<30:
-            print(show_id,"already_done or too small")
+        if str(show_id) in done_ids or int(len(show_df) * offset) < 30:
+            print(show_id, "already_done or too small")
             continue
-        print("Predicting shows:",i_show/n_show, i_show, n_show)
+        print("Predicting shows:", i_show / n_show, i_show, n_show)
 
         # Calculating target df which is the real trend line we want to predict
-        target = show_df[['date', 'percentage_bought']].copy()
-        target['date'] = pd.to_datetime(target['date'], format='%d/%m/%Y')
-        target.set_index('date', inplace=True)
-
+        target = show_df[["date", "percentage_bought"]].copy()
+        target["date"] = pd.to_datetime(target["date"], format="%d/%m/%Y")
+        target.set_index("date", inplace=True)
 
         # getting only the first "offset" part of the dataset so we can predict the rest of the trend line
-        known_df = show_df.head(int(len(show_df)* offset)).copy()
+        known_df = show_df.head(int(len(show_df) * offset)).copy()
 
         # Predicting the trend for each model in the ensemble
         boot_preds = []
         for model in models:
-            predicted_trend = predict_trend(known_df, ts_engine.target, model, show_df["last_date"][0])
+            predicted_trend = predict_trend(
+                known_df, ts_engine.target, model, show_df["last_date"][0]
+            )
             if ts_engine.target == "percentage_bought_log1p":
                 boot_preds.append(np.expm1(predicted_trend["predictions"].values))
             else:
@@ -210,7 +150,7 @@ def test_xgb(test_shows, models, lower_q, upper_q, folder, offset=0.4, plot=Fals
             boot_preds = np.stack(boot_preds, axis=0)
             # numero di bootstrap
             B = boot_preds.shape[0]
-            
+
             # stima della media predetta
             mean = np.mean(boot_preds, axis=0)
             # errore standard della media
@@ -219,7 +159,7 @@ def test_xgb(test_shows, models, lower_q, upper_q, folder, offset=0.4, plot=Fals
             alpha = 1 - (upper_q - lower_q)
             df = B - 1
             # quantile t critico
-            t_crit = stats.t.ppf(1 - alpha/2, df)
+            t_crit = stats.t.ppf(1 - alpha / 2, df)
             # calcolo dei limiti dell’intervallo di confidenza
             lower = mean - t_crit * se
             upper = mean + t_crit * se
@@ -228,16 +168,20 @@ def test_xgb(test_shows, models, lower_q, upper_q, folder, offset=0.4, plot=Fals
             mean = boot_preds[1]
             upper = boot_preds[2]
 
-
-        save_predicted_trends(index, target["percentage_bought"].loc[index].values, 
-                              mean, lower, upper, folder+f"{show_id}.csv")
-
+        save_predicted_trends(
+            index,
+            target["percentage_bought"].loc[index].values,
+            mean,
+            lower,
+            upper,
+            folder + f"{show_id}.csv",
+        )
 
         if plot:
             plt.plot(target, color="black")
-            plt.plot(index,lower, color="orange")
-            plt.plot(index,mean, color="red")
-            plt.plot(index,upper, color="blue")
+            plt.plot(index, lower, color="orange")
+            plt.plot(index, mean, color="red")
+            plt.plot(index, upper, color="blue")
             plt.plot(index, target["percentage_bought"].loc[index], color="purple")
             plt.show()
 
@@ -245,10 +189,10 @@ def test_xgb(test_shows, models, lower_q, upper_q, folder, offset=0.4, plot=Fals
 if __name__ == "__main__":
 
     ts_engine.config_recap()
-    
-    train_files = glob.glob(os.path.join(path+f"/shows/train", "*.gzip"))
-    validation_files = glob.glob(os.path.join(path+f"/shows/validation", "*.gzip"))
-    test_files = glob.glob(os.path.join(path+f"/shows/test", "*.gzip"))
+
+    train_files = glob.glob(os.path.join(path + f"/shows/train", "*.gzip"))
+    validation_files = glob.glob(os.path.join(path + f"/shows/validation", "*.gzip"))
+    test_files = glob.glob(os.path.join(path + f"/shows/test", "*.gzip"))
 
     train_shows = []
     for file in train_files:
@@ -262,52 +206,47 @@ if __name__ == "__main__":
     for file in test_files:
         test_shows.append(pd.read_parquet(file))
 
-    lower_q = (1-xgb_config.ic_dim)/2
-    upper_q = 1-lower_q 
+    lower_q = (1 - xgb_config.ic_dim) / 2
+    upper_q = 1 - lower_q
 
-    if ts_engine.ensemble:
-        best_params = load_parameters(ts_engine.pb_name) 
-        ensemble = load_ensemble(ts_engine.pb_name) 
+    best_params = load_parameters(ts_engine.pb_name)
+    ensemble = load_ensemble(ts_engine.pb_name)
 
-        if best_params == None and ts_engine.bayes_search:
-            best_params = get_best_params(train_shows, 5)
-            save_parameters(ts_engine.pb_name, best_params)
+    if best_params == None:
+        best_params = get_best_params(train_shows, 5)
+        save_parameters(ts_engine.pb_name, best_params)
 
-        if ensemble == None:
-            ensemble = bootstrap_models(train_shows+validation_shows,best_params, 70)
-            save_ensemble(ts_engine.pb_name, ensemble)
-    
-    if ts_engine.ensemble == False:
-        model = train_single_xgb(train_shows+validation_shows)
-        ensemble = [model]
+    if ensemble == None:
+        ensemble = bootstrap_models(train_shows + validation_shows, best_params, 70)
+        save_ensemble(ts_engine.pb_name, ensemble)
 
-    if ts_engine.quantile_regression:
-        ensemble = train_quantile_regressor(train_shows+validation_shows, quantiles=[lower_q, 0.5, upper_q])
 
-    
- 
     # Creating a folder for storing predictions and metrics about the model
-    save_folder = path+f"/{ts_engine.pb_name}/"
+    save_folder = path + f"/{ts_engine.pb_name}/"
     if not os.path.isdir(save_folder):
         os.makedirs(save_folder)
-        os.makedirs(save_folder+"/train/")
-        os.makedirs(save_folder+"/validation/")
-        os.makedirs(save_folder+"/test/")
-
+        os.makedirs(save_folder + "/train/")
+        os.makedirs(save_folder + "/validation/")
+        os.makedirs(save_folder + "/test/")
 
     for set_name in ["test", "train_validation"]:
-        if set_name=="test":
+        if set_name == "test":
             shows = test_shows
-        if set_name=="train_validation":
+        if set_name == "train_validation":
             shows = train_shows + validation_shows
 
         # Getting predictions for test shows
-        test_xgb(shows, ensemble, lower_q, upper_q, 
-                 folder=save_folder+f"/{set_name}/",
-                 plot=False, )
+        test_xgb(
+            shows,
+            ensemble,
+            lower_q,
+            upper_q,
+            folder=save_folder + f"/{set_name}/",
+            plot=False,
+        )
 
-        # Evaluating Metrics    
-        ts_metrics = TimeSeriesMetrics(save_folder+f"/{set_name}/", lower_q, upper_q)
-        res = ts_metrics.evaluate([5,10,15,20,25,30], save_folder, set_name)
+        # Evaluating Metrics
+        ts_metrics = TimeSeriesMetrics(save_folder + f"/{set_name}/", lower_q, upper_q)
+        res = ts_metrics.evaluate([5, 10, 15, 20, 25, 30], save_folder, set_name)
         print(f"\nMetrics summart of {set_name} set:")
         print(res)

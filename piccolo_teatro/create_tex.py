@@ -21,7 +21,7 @@ for idx, chunk in enumerate(chunks, start=1):
     print(f"    {header} \\\\ \\hline")
     # Data rows
     for _, row in df.iterrows():
-        row_vals = [str(round(row[col],3)) if col else "" for col in chunk]
+        row_vals = [str(row[col]) if col else "" for col in chunk]
         print("    " + " & ".join(row_vals) + " \\\\ \\hline")
     print("  \\end{tabular}")
     print("\\end{table}\n")
