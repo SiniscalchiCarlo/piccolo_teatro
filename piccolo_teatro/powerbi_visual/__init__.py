@@ -131,7 +131,7 @@ def powerbi_visual(dataset, offset, static = True, gain_trend = False):
     product_name = dataset["PRODUCT_EXTERNAL_NAME"].iloc[-1]
 
     
-    # From raw data we run a pipelan that cleans them and adds features
+    # Run a pipeline to clean the raw data and add features.
     df = run_data_pipeline(SALES, PRODUCTS, SEASONS, show_id)
     sales_duration = df["sales_duration"].iloc[0]
     known_trend = df["percentage_bought"].copy()
@@ -149,7 +149,7 @@ def powerbi_visual(dataset, offset, static = True, gain_trend = False):
     known_trend = known_trend.rename("predictions")
     known_and_predicted = pd.concat([known_trend, future_prediction])    
 
-    # Generate fixed trend prediction if there is enoght data
+    # Generate a fixed trend prediction if there is enough data.
     predicted_fixed_trend = []
     if int(sales_duration * offset) <= len(df):
         fixed_df = df.head(int(sales_duration * offset)).copy()

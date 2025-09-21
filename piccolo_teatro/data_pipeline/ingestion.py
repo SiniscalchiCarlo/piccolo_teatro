@@ -74,7 +74,7 @@ class Sales():
         self.df["date"] = pd.to_datetime(self.df["date"], errors='coerce')
 
     def clean_cols(self):
-        # keep only the coulmns needed
+        # Keep only the columns needed.
         self.df = self.df[list(self.cols_too_keep)]
 
     def clean_rows(self):
@@ -88,7 +88,7 @@ class Sales():
         self.df = self.df[self.df['operation_kind'].isin(
             self.operations_to_keep)]
         
-        # considering only sales operations
+        # Consider only sales operations.
         self.df = self.df[self.df['operation_type'] == "Venduti"]
     
     def assign_index(self):

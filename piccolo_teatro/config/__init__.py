@@ -18,9 +18,9 @@ class XGBConfig(BaseModel):
     ic_dim: confloat(ge=0.0, le=1.0) = 0.9
 
 
-# Class that descrives a feauture 
-# (or features if are all of the same type 
-# eg. moving avarages with different periods)
+# Class that describes a feature
+# (or features if they are all of the same type,
+#  e.g. moving averages with different periods)
 
 class Feature(BaseModel):
     columns: List[str]
@@ -28,7 +28,7 @@ class Feature(BaseModel):
     enabled: bool
     update: Callable = None
 
-# Config used to keep track  and manage experiments
+# Configuration used to track and manage experiments
 class ProblemConfig(BaseModel):
     periods: List[int] = [2, 4, 6, 8, 10, 15, 20, 30]
     target: Literal["percentage_bought", "percentage_bought_delta", "percentage_bought_log1p"]
@@ -40,10 +40,10 @@ class ProblemConfig(BaseModel):
 
 problem_config = ProblemConfig(target = "percentage_bought_log1p")
 
-# Class used to manage features updates in iterative forecasting.
+# Class used to manage feature updates in iterative forecasting.
 # - The input DataFrame represents the known data that the model
 #   will use to make predictions and subsequently update with the predicted values.
-# - You can enable and disable features
+# - Features can be enabled or disabled.
 class TimeSeriesEngine:
     def __init__(self, df=None):
         self.df = df
@@ -81,7 +81,7 @@ class TimeSeriesEngine:
                                                             update=self.__update_const)
         
 
-        # Variables features
+        # Variable features
         self.start_sales_distance: Feature = Feature(columns=["start_sales_distance"],
                                                             const=False,
                                                             enabled=True,
@@ -111,7 +111,7 @@ class TimeSeriesEngine:
                                                 enabled=True,
                                                 update=self.__update_target)
         
-        # Calling functions that generate multiple features (es. moving avg of multiple periods)
+        # Initialize functions that generate multiple features (e.g. moving averages over multiple periods)
         self.__init_target_avg(enabled=True)
 
         self.__init_target_delta(enabled=True)
@@ -121,33 +121,34 @@ class TimeSeriesEngine:
         self.__get_features()
         
     def update_features(self, prediction):
-        '''
-        Updates the features of self.df using the new prediction. 
-        the .update() functions of the Features are called.
-        '''
+        """
+        Update the features of ``self.df`` using the new prediction.
+
+        The ``Feature.update`` callbacks registered on each enabled feature are executed.
+        """
 
         if self.df is None:
             raise Exception("Please add a input df to Feature class before calling update_features")
         self.new_prediction = prediction
         self.new_row = {}
 
-        # Compute variable features
+        # Compute variable features.
         for feature in self.variable_features:
             update_function = feature.update
             update_function()
 
-        # Copy constant features
+        # Copy constant features.
         for feature in self.const_features:
             update_function = feature.update
             update_function(feature.columns[0])
 
-        # Append to DataFrame new values
+        # Append new values to the DataFrame.
         self.new_row = pd.DataFrame(self.new_row)
         self.df = pd.concat([self.df, self.new_row], ignore_index=True)
 
     def __get_features(self):
         """
-        Get a list of all the features, constant features, variable features
+        Populate collections of enabled features grouped by type.
         """
         self.enabled_features = []
         self.const_features = []
@@ -164,7 +165,7 @@ class TimeSeriesEngine:
     def __create_period_names(self, col_name: str) -> List[str]:
         return [col_name+"_"+str(period) for period in self.periods]
 
-    # Init methods 
+    # Initialization helpers
     def __init_target_avg(self, enabled):
         columns = self.__create_period_names(f"{self.target}_avg")
         self.target_avg = Feature(columns=columns,
@@ -189,7 +190,7 @@ class TimeSeriesEngine:
                                     enabled=enabled,
                                     update=self.__update_target_shifted)
 
-    # Update methods
+    # Update helpers
     def __update_const(self, col_name):
         const_val = self.df[col_name].iloc[-1]
         self.new_row[col_name] = [const_val]
@@ -216,7 +217,7 @@ class TimeSeriesEngine:
         s = pd.Series(values)
         first_val = s.iloc[0]
         for period in self.periods:
-            # shift e fill dei NaN con il primo valore
+            # Shift and fill NaN values with the first observed value.
             shifted_val = s.shift(period).fillna(first_val).iloc[-1]
             self.new_row[f"{self.target}_shifted_{period}"] = shifted_val
 

@@ -42,20 +42,22 @@ def save_predicted_trends(index, target, mean, low, up, file_path):
 
 
 def get_bootstrap_df(shows_df):
-    '''
-    show_df: list of N pandas df
-    Returns df_concat concatentation of N randoomly choosed dfs from show_df
-    '''
+    """
+    Create a bootstrap sample from the provided list of show DataFrames.
+
+    Returns a concatenated DataFrame built from randomly chosen elements of ``shows_df``.
+    """
     sampled_dfs = random.choices(shows_df, k=len(shows_df))
     df_concat = pd.concat(sampled_dfs, ignore_index=True)
     return df_concat
 
 
 def bootstrap_models(shows_df, best_params, n_bootstraps=100):
-    '''
-    Function used to train a ensemble on n_bootstraps XGBoost models
-    Returns a list with the trained models.
-    '''
+    """
+    Train an ensemble of XGBoost models using bootstrap resampling.
+
+    Returns a list containing the trained models.
+    """
     print("Training and ensemble of models:")
     print("best parameters:", best_params)
 
@@ -84,9 +86,9 @@ def bootstrap_models(shows_df, best_params, n_bootstraps=100):
 
 
 def get_best_params(train_shows, n_splits):
-    '''
-    Performs BayesSearch and return the optimal paramenters.
-    '''
+    """
+    Run a Bayesian hyperparameter search and return the optimal parameters.
+    """
     train_df = pd.concat(train_shows, axis=0, ignore_index=True)
     groups = train_df["show_id"].copy()
     train_df = keep_enabled_columns(train_df)
@@ -116,14 +118,12 @@ def get_best_params(train_shows, n_splits):
 
 
 def test_xgb(test_shows, models, lower_q, upper_q, folder, offset=0.4, plot=False):
-    '''
-    Function used to test the performances of the ensemble of models.
-    Performs for each show in the test_shows folder iterative forecasting to predict 
-    the sales trend. For each predicted day the mean prediction and the confidence interval
-    for the mean of are computed given all the predictions of the ensemble.
-    The predicted mean, lower bound and upper bound are saved to later compute metrics to
-    evaluate the model ensemble.
-    '''
+    """
+    Evaluate the ensemble of models via iterative forecasting for each show in ``test_shows``.
+
+    For every predicted day, compute the ensemble mean prediction and corresponding confidence
+    interval bounds, then persist them for later metric evaluation.
+    """
     # Getting already predicted and saved shows
     saved_trends_folder = os.path.dirname(folder)
     already_saved = glob.glob(os.path.join(saved_trends_folder, "*.csv"))
@@ -167,19 +167,19 @@ def test_xgb(test_shows, models, lower_q, upper_q, folder, offset=0.4, plot=Fals
         if ts_engine.quantile_regression is False:
 
             boot_preds = np.stack(boot_preds, axis=0)
-            # numero di bootstrap
+            # Number of bootstrap samples.
             B = boot_preds.shape[0]
 
-            # stima della media predetta
+            # Estimated mean prediction.
             mean = np.mean(boot_preds, axis=0)
-            # errore standard della media
+            # Standard error of the mean.
             se = np.std(boot_preds, axis=0, ddof=1)
-            # livello di confidenza (es. lower_q=0.025 e upper_q=0.975 → confidenza 95%)
+            # Confidence level (e.g., lower_q=0.025 and upper_q=0.975 yield 95% confidence).
             alpha = 1 - (upper_q - lower_q)
             df = B - 1
-            # quantile t critico
+            # Critical t quantile.
             t_crit = stats.t.ppf(1 - alpha / 2, df)
-            # calcolo dei limiti dell’intervallo di confidenza
+            # Compute the confidence interval bounds.
             lower = mean - t_crit * se
             upper = mean + t_crit * se
         else:
@@ -209,7 +209,7 @@ if __name__ == "__main__":
 
     ts_engine.config_recap()
     
-    # Reading input data and creating list of shows divided in train, validation and test
+    # Read input data and create lists of shows split into train, validation, and test sets.
     train_files = glob.glob(os.path.join(path + f"/shows/train", "*.gzip"))
     validation_files = glob.glob(os.path.join(path + f"/shows/validation", "*.gzip"))
     test_files = glob.glob(os.path.join(path + f"/shows/test", "*.gzip"))
@@ -229,8 +229,7 @@ if __name__ == "__main__":
     lower_q = (1 - xgb_config.ic_dim) / 2
     upper_q = 1 - lower_q
     
-    # Loading best parameters and trained models for the configured problem
-    # if they where already calculated.
+    # Load the best parameters and trained models for the configured problem if they were already computed.
     best_params = load_parameters(ts_engine.pb_name)
     ensemble = load_ensemble(ts_engine.pb_name)
 
@@ -243,7 +242,7 @@ if __name__ == "__main__":
         save_ensemble(ts_engine.pb_name, ensemble)
 
 
-    # Creating a folder for storing predictions and metrics about the model
+    # Create a folder for storing predictions and metrics about the model.
     save_folder = path + f"/{ts_engine.pb_name}/"
     if not os.path.isdir(save_folder):
         os.makedirs(save_folder)
@@ -251,14 +250,14 @@ if __name__ == "__main__":
         os.makedirs(save_folder + "/validation/")
         os.makedirs(save_folder + "/test/")
 
-    # Computing metrics for test and train+validation sets
+    # Compute metrics for the test and train+validation sets.
     for set_name in ["test", "train_validation"]:
         if set_name == "test":
             shows = test_shows
         if set_name == "train_validation":
             shows = train_shows + validation_shows
 
-        # Getting predictions for test shows
+        # Generate predictions for the selected shows.
         test_xgb(
             shows,
             ensemble,
@@ -268,7 +267,7 @@ if __name__ == "__main__":
             plot=False,
         )
 
-        # Evaluating Metrics
+        # Evaluate metrics.
         ts_metrics = TimeSeriesMetrics(save_folder + f"/{set_name}/", lower_q, upper_q)
         res = ts_metrics.evaluate([5, 10, 15, 20, 25, 30], save_folder, set_name)
         print(f"\nMetrics summart of {set_name} set:")

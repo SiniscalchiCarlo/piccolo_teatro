@@ -9,12 +9,13 @@ import xgboost as xgb
 pd.set_option("display.max_columns", None)
 
 def predict_trend(known_df, target, model, last_date):
-    '''
-    Predicts the sales trend of a show:
-    Given known features up to day t, this function predicts the cumulative percentage of sales for day t+1.
-    It then updates the features (assuming the prediction is equal to the real value) and proceeds to predict the next day's value.
-    This process is repeated iteratively until the full sales trend is generated.
-    '''
+    """
+    Predict the sales trend of a show.
+
+    Given known features up to day ``t``, forecast the cumulative percentage of sales for day ``t+1``.
+    The features are then updated (assuming the prediction equals the true value) before proceeding to
+    predict subsequent days. This loop continues until the full sales trend has been generated.
+    """
     start_time = time()
     current_day = known_df["date"].iloc[-1]
 
@@ -24,7 +25,7 @@ def predict_trend(known_df, target, model, last_date):
     predictions = []
     predicitons_days = []
     
-    # Keep iterating until we predict the last day (day of the last performance of the show)
+    # Keep iterating until we predict the last day (day of the final performance of the show).
     n_predictions = df["sales_duration"].iloc[0]-len(known_df)   
 
     last_date = last_date-pd.Timedelta(days=1)
@@ -38,13 +39,13 @@ def predict_trend(known_df, target, model, last_date):
         else:
             prediction = model.predict(input_row)[0]
         
-        # Prediciton need to be always highes than the last percentage 
+        # Ensure the prediction is never below the last observed percentage.
         prediction = max(prediction, input_row.iloc[0][target])
 
         predictions.append(prediction)
         predicitons_days.append(current_day)
 
-        # Updating all the features with the new prediction
+        # Update all features with the new prediction.
         ts_engine.update_features(prediction)
 
     prediction_df = pd.DataFrame({"predictions": predictions}, index=predicitons_days)

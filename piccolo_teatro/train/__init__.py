@@ -7,8 +7,12 @@ from piccolo_teatro import ts_engine
 
 def separete_features_targets(df, sort=False, shuffle=False):
     """
-    splits the df into features and target
-    sort: if true sorts the df, if false shuffles it
+    Split the DataFrame into feature columns and the target series.
+
+    Args:
+        df: DataFrame containing features and target columns.
+        sort: If ``True``, sort the DataFrame by date.
+        shuffle: If ``True``, shuffle the DataFrame rows.
     """
     if df is None:
         raise Exception("Please load the df first")
@@ -16,7 +20,7 @@ def separete_features_targets(df, sort=False, shuffle=False):
     if sort and shuffle:
         raise Exception("You can't both shuffle and sort, please choose one")
     
-    # Convert date column to datetime"
+    # Convert the date column to datetime.
     df.loc[:, "date"] = pd.to_datetime(df["date"], format='%d/%m/%Y')
     df = df.set_index("date")
 
@@ -34,9 +38,9 @@ def separete_features_targets(df, sort=False, shuffle=False):
 
 def keep_enabled_columns(df):
     """
-    Keeps only the enabled features and the target column
+    Keep only the enabled features and the target column.
     """
-    # Removing not needed features
+    # Remove unused features.
     features = ts_engine.enabled_features
     target_col = f"TARGET_{ts_engine.target}"
     columns_to_keep = ["date", target_col]

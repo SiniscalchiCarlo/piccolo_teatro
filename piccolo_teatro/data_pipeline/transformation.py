@@ -15,18 +15,18 @@ path = os.environ.get("FOLDER_PATH")
 encoding_dict = ts_engine.encoding_dict
 
 def get_season_dates(seasons_df, season_id: str):
-    '''
-    From season id to start and end date of the season
-    '''
+    """
+    Return the start and end dates associated with the provided season identifier.
+    """
     season_row = seasons_df[seasons_df["season_id"] == season_id]
     start_date = season_row["inizio_vendite"].iloc[0]
     end_date = season_row["fine_vendite"].iloc[0]
     return start_date, end_date
 
 def add_show_info(products_df, df, show_id):
-    '''
-    This functions enriches the dataframe by adding informations about shows (hour, number of tickes...)
-    '''
+    """
+    Enrich the DataFrame with show-specific information (time, ticket availability, etc.).
+    """
     show_id=int(show_id)
     performances_same_show = products_df[products_df["show_id"]==show_id]
 
@@ -80,20 +80,19 @@ def add_show_info(products_df, df, show_id):
     ]
 
     if performance_state=="In esecuzione" and show_type not in performances_to_not_consider and performance_space in spaces_to_consider:
-        df["show_type"] = show_type 
-        df["show_capacity"] = show_capacity 
+        df["show_type"] = show_type
+        df["show_capacity"] = show_capacity
         df["num_performances"] = len(performances_same_show)
         df["last_date"] = last_date
         df = one_hot_encode(df, encoding_dict)
         return df
     else:
         return pd.DataFrame()
-        
+
 def add_features(seasons: Seasons, products: Products, df: pd.DataFrame, live_data=False):
-        '''
-        This function is called to enrich the sales dataframe with new features, 
-        ensuring it contains all the features that might be needed.
-        '''
+        """
+        Enrich the sales DataFrame with the features required by the forecasting pipeline.
+        """
         
     
         if df['show_id'].nunique() != 1:
@@ -114,7 +113,7 @@ def add_features(seasons: Seasons, products: Products, df: pd.DataFrame, live_da
         df = add_cumulative_sum(df, column_names=["gain", "tickets"])
         df["avg_ticket_price"] = df["gain_cum_sum"]/df["tickets_cum_sum"]
         
-        # Add informations about the performance, and checks the product is one of the one we are interested in 
+        # Add information about the performance and ensure the product is relevant.
         df = add_show_info(products.df, df, show_id)  
         if not df.empty:
             if live_data:
@@ -122,37 +121,37 @@ def add_features(seasons: Seasons, products: Products, df: pd.DataFrame, live_da
             else:
                 fill_date = df["last_date"].iloc[0]
 
-            # Aggiungo i dati dei giorni mancanti (giorni senza vendite), li riempio mettendo l'ultimo valore noto
+            # Add missing days (days without sales) by forward filling the last known values.
             date_range = pd.date_range(start=df["date"].min(), end=fill_date)
             df = df.set_index("date").reindex(date_range, method="ffill")
             df["date"] = df.index
 
-        
-            # Distanza della transazione dall'inizio e dalla fine della stagione
+
+            # Distance of each transaction from the beginning and end of the season.
             df["start_sales_distance"] = (df["date"]-start_date).dt.days.abs()
             df["end_season_distance"] = (df["date"]-end_date).dt.days.abs()
             df["sales_duration"] = (df["last_date"]-start_date).dt.days
             df["end_sales_distance"] = (df["last_date"]-df["date"]).dt.days
             df["percentage_sales_day"] = df["start_sales_distance"]/(df["last_date"]-start_date).dt.days
             df["percentage_sales_day"] = df["percentage_sales_day"]
-        
-        
-            # Numero biglietti rimanenti per raggiungere capienza massima
+
+
+            # Number of tickets remaining to reach full capacity.
             df["remaining_tickets"] = df["show_capacity"]-df["tickets_cum_sum"]
             df["percentage_bought"] = df["tickets_cum_sum"]/df["show_capacity"]
             df["percentage_bought_delta"] = df["percentage_bought"].diff(periods=1)
 
-            
+
             df = add_log_transform(df, "percentage_bought")
 
             df = add_deltas(df, ["percentage_bought", "percentage_bought_log1p"], [2,4,6,8,10,15,20,30])
-            # Aggiungo medie mobili con differenti periodi
+            # Add moving averages calculated with different periods.
             df = add_moving_avarages(df, ["percentage_bought_delta", "gain_cum_sum", "tickets_cum_sum", "percentage_bought","percentage_bought_log1p"], [2,4,6,8,10,15,20,30])
 
-            # Aggiungo valori shiftati
+            # Add shifted values.
             df = add_shifted_values(df, ["percentage_bought_delta", "gain_cum_sum", "tickets_cum_sum", "percentage_bought","percentage_bought_log1p"], [2,4,6,8,10,15,20,30])
-            
-            # Aggiungo i possibili target da prevedere:
+
+            # Add the possible targets to be predicted.
             df = add_targets(df, ["percentage_bought", "percentage_bought_log1p", "percentage_bought_delta"])
             
         else:
