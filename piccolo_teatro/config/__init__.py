@@ -4,7 +4,8 @@ import pandas as pd
 from skopt.space import Real, Integer
 
 class XGBConfig(BaseModel):
-
+    
+    # Space to search optimal parameters with Bayes Search
     param_space: dict = {
         'n_estimators': Integer(100, 300),
         'max_depth': Integer(3, 10),
@@ -12,9 +13,14 @@ class XGBConfig(BaseModel):
         'subsample': Real(0.5, 1.0),
         'colsample_bytree': Real(0.5, 1.0)
     }    
-
+    
+    # Confidence interval dimension
     ic_dim: confloat(ge=0.0, le=1.0) = 0.9
 
+
+# Class that descrives a feauture 
+# (or features if are all of the same type 
+# eg. moving avarages with different periods)
 
 class Feature(BaseModel):
     columns: List[str]
@@ -22,6 +28,7 @@ class Feature(BaseModel):
     enabled: bool
     update: Callable = None
 
+# Config used to keep track  and manage experiments
 class ProblemConfig(BaseModel):
     periods: List[int] = [2, 4, 6, 8, 10, 15, 20, 30]
     target: Literal["percentage_bought", "percentage_bought_delta", "percentage_bought_log1p"]
@@ -32,6 +39,11 @@ class ProblemConfig(BaseModel):
 
 
 problem_config = ProblemConfig(target = "percentage_bought_log1p")
+
+# Class used to manage features updates in iterative forecasting.
+# - The input DataFrame represents the known data that the model
+#   will use to make predictions and subsequently update with the predicted values.
+# - You can enable and disable features
 class TimeSeriesEngine:
     def __init__(self, df=None):
         self.df = df
@@ -47,21 +59,6 @@ class TimeSeriesEngine:
             "show_type": ['Internazionale', 'Ospitalità', 'Collaborazione', 'Produzione', 'Festival'],
             #    "performance_day": ["lun", "mar", "mer", "gio", "ven", "sab", "dom"],
         }
-
-
-        # Initialization of constant features
-        #self.performance_day: Feature = Feature(columns=self.encoding_dict["performance_day"],
-        #                                            const=True,
-        #                                            enabled=False,
-        #                                            update=self.__update_const)
-        #self.performance_hour: Feature = Feature(columns=["performance_hour"],
-        #                                                    const=True,
-        #                                                    enabled=False,
-        #                                                    update=self.__update_const)
-        #self.performance_number: Feature = Feature(columns=["performance_number"],
-        #                                                    const=True,
-        #                                                    enabled=False,
-        #                                                    update=self.__update_const)
 
         self.show_type: Feature = Feature(columns=self.encoding_dict["show_type"],
                                                         const=True,
@@ -108,13 +105,6 @@ class TimeSeriesEngine:
                                                         const=False,
                                                         enabled=False)
         
-        # self.tickets_cum_sum: Feature = Feature(columns=["tickets_cum_sum"],
-        #                                             const=False,
-        #                                             enabled=False)
-        # 
-        # self.tickets: Feature = Feature(columns=["tickets"],
-        #                                         const=False,
-        #                                         enabled=False)
         
         self.target_feature = Feature(columns=[self.target],
                                                 const=False,
@@ -131,19 +121,27 @@ class TimeSeriesEngine:
         self.__get_features()
         
     def update_features(self, prediction):
+        '''
+        Updates the features of self.df using the new prediction. 
+        the .update() functions of the Features are called.
+        '''
+
         if self.df is None:
             raise Exception("Please add a input df to Feature class before calling update_features")
         self.new_prediction = prediction
         self.new_row = {}
 
+        # Compute variable features
         for feature in self.variable_features:
             update_function = feature.update
             update_function()
 
+        # Copy constant features
         for feature in self.const_features:
             update_function = feature.update
             update_function(feature.columns[0])
 
+        # Append to DataFrame new values
         self.new_row = pd.DataFrame(self.new_row)
         self.df = pd.concat([self.df, self.new_row], ignore_index=True)
 
@@ -200,19 +198,16 @@ class TimeSeriesEngine:
         self.new_row[f"{self.target}"] = [self.new_prediction]
 
     def __update_target_avg(self):
-        # concateno storico + nuova predizione
-        values = self.df[f"{self.target}"].tolist() + [self.new_prediction]
+        # Concatenate the historic series with the new prediction before computing rolling statistics.
         s = pd.Series(values)
         for period in self.periods:
-            # rolling mean e prendo solo l'ultimo
-            avg_val = s.rolling(period).mean().iloc[-1]
+            # Compute the rolling mean and keep only the most recent value.
             self.new_row[f"{self.target}_avg_{period}"] = avg_val
 
     def __update_target_delta(self):
         values = self.df[f"{self.target}"].tolist() + [self.new_prediction]
         s = pd.Series(values)
         for period in self.periods:
-            # differenza tra t e t-period
             delta_val = s.diff(periods=period).iloc[-1]
             self.new_row[f"{self.target}_delta_{period}"] = delta_val
 
@@ -244,6 +239,10 @@ class TimeSeriesEngine:
        
 
     def config_recap(self):
+        '''
+        Convenience printout used during experimentation to verify which
+        features are currently active.
+        '''
         const_feat = self.const_features
         variable_feat = self.variable_features
 

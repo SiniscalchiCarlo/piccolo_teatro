@@ -37,6 +37,12 @@ def save_splits(train: pd.DataFrame, validation: pd.DataFrame, test: pd.DataFram
 
 
 def create_full_datasets(sales: Sales, products: Products, seasons: Seasons, path: str, save_csv=False, train_dim=0.6, val_dim=0.2):
+    '''
+    Divide shows in train, validation and test folders.
+    A file is created for each show containing 
+    all the data of that show to prevent data leakage across
+    different folder.
+    '''
     save_folder = f"{path}/shows/"
     if not os.path.isdir(save_folder):
         os.makedirs(save_folder)
@@ -75,8 +81,6 @@ def create_full_datasets(sales: Sales, products: Products, seasons: Seasons, pat
         
         # We save the data only if has at least 10 days of sales
         if len(group.index.unique().tolist())>10:
-            cols_with_missing = group.columns[group.isna().any()].tolist()
-            rows_with_missing = group.index[group.isna().any(axis=1)].tolist()
             group.to_parquet(f"{path}/shows/{folder}/{show_id}.gzip", index=False)
             if save_csv:
                 group.to_csv(f"{path}/shows/{folder}/{show_id}.csv", index=False)

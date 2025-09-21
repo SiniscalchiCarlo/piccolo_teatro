@@ -15,6 +15,9 @@ path = os.environ.get("FOLDER_PATH")
 encoding_dict = ts_engine.encoding_dict
 
 def get_season_dates(seasons_df, season_id: str):
+    '''
+    From season id to start and end date of the season
+    '''
     season_row = seasons_df[seasons_df["season_id"] == season_id]
     start_date = season_row["inizio_vendite"].iloc[0]
     end_date = season_row["fine_vendite"].iloc[0]
