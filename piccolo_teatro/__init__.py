@@ -65,13 +65,13 @@ def rename_cols(dataset):
     return SALES, PRODUCTS, SEASONS
 
 
-def plot_trends(static, product_name, known_gain, known_trend, future_prediction, predicted_fixed_trend, scale_factor):
-    if static:
+def plot_trends(static_plot, product_name, real_trend, known_trend, future_prediction, predicted_fixed_trend, scale_factor):
+    if static_plot:
         
         plt.plot(future_prediction*scale_factor, color="orange", label="Future Prediction")
         plt.plot(known_trend*scale_factor, color="blue", label="Known Trend")
-        if scale_factor != 1:
-            plt.plot(known_gain, color="black", label="Real Trend")
+        if real_trend is not None:
+            plt.plot(real_trend, color="black", label="Real Trend")
 
         if len(predicted_fixed_trend) > 0:
             style.use('seaborn-v0_8-pastel')
@@ -85,11 +85,11 @@ def plot_trends(static, product_name, known_gain, known_trend, future_prediction
         plt.show()
     else:
         fig = go.Figure()
-        fig.add_trace(go.Scatter(x=future_prediction.index, y=future_prediction["predictions"]*scale_factor, mode='lines', name='Future Prediction', line=dict(width=4)))
+        fig.add_trace(go.Scatter(x=future_prediction.index, y=future_prediction*scale_factor, mode='lines', name='Future Prediction', line=dict(width=4)))
         fig.add_trace(go.Scatter(x=known_trend.index, y=known_trend*scale_factor, mode='lines', name='Known Trend', line=dict(width=4)))
         
-        if scale_factor != 1:
-            fig.add_trace(go.Scatter(x=future_prediction.index, y=known_gain, mode='lines', name='Future Prediction', line=dict(width=4)))
+        if real_trend is not None:
+            fig.add_trace(go.Scatter(x=future_prediction.index, y=real_trend, mode='lines', name='Real Trend', line=dict(width=4)))
 
         if len(predicted_fixed_trend) > 0:
             fig.add_trace(go.Scatter(x=predicted_fixed_trend.index, y=predicted_fixed_trend*scale_factor, mode='lines', name='Fixed Trend Prediction', line=dict(width=4)))
@@ -116,8 +116,8 @@ def scale_trend(trend, new_end):
     scaled_values = trend.apply(lambda p: start + scale_factor * (p - start))
     return scaled_values
 
-def powerbi_visual(dataset, offset, static = True, gain_trend = False):
-
+def powerbi_visual(dataset, offset, static_plot = True, trend_type = "perc"):
+    # trend_type = ["perc", "gain", "tickets"]
     SALES, PRODUCTS, SEASONS = rename_cols(dataset)
 
     # Get show info
@@ -133,19 +133,26 @@ def powerbi_visual(dataset, offset, static = True, gain_trend = False):
     df = run_data_pipeline(SALES, PRODUCTS, SEASONS, show_id)
     sales_duration = df["sales_duration"].iloc[0]
     known_trend = df["percentage_bought"].copy()
-    known_gain = df["gain_cum_sum"].copy()
+
     capacity = df["show_capacity"].iloc[0]
-
-    scale_factor = 1
-    if gain_trend:
+    if trend_type == "perc":
+        scale_factor = 1
+    
+    real_trend = None
+    if trend_type == "gain":
         scale_factor = capacity * (avg_ticket_price)
+        real_trend = df["gain_cum_sum"].copy()
 
+    if trend_type == "tickets":
+        scale_factor = capacity
+        real_trend = df["tickets_cum_sum"].copy()
 
     # Make prediction using all the known data
     model = get_model("XGB_trend2")
     future_prediction = predict_trend(df, model)
     known_trend = known_trend.rename("predictions")
-    known_and_predicted = pd.concat([known_trend, future_prediction])    
+    frames = [df for df in [known_trend, future_prediction] if not df.empty]
+    known_and_predicted = pd.concat(frames)   
 
     # Generate fixed trend prediction if there is enoght data
     predicted_fixed_trend = []
@@ -155,8 +162,8 @@ def powerbi_visual(dataset, offset, static = True, gain_trend = False):
         predicted_fixed_trend = scale_trend(predicted_fixed_trend["predictions"],target_perc)
         
 
-    plot_trends(static, product_name, 
-                known_gain,
+    plot_trends(static_plot, product_name, 
+                real_trend,
                 known_trend, 
                 known_and_predicted, 
                 predicted_fixed_trend,

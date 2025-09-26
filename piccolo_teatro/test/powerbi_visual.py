@@ -7,96 +7,12 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import os
 
-os.chdir(u'C:/Users/39370/PythonEditorWrapper_eb3663a9-df77-4981-a463-cf73c8cc62b7')
-dataset = pd.read_csv('input_df_1475bfb3-7cbb-4ba0-9c1e-8285dbab6262.csv')
+os.chdir(u'C:/Users/39370/PythonEditorWrapper_0484369b-1f36-4949-b751-d4dcc5e1e656')
+dataset = pd.read_csv('input_df_be21c7ba-35f1-40b4-b7f3-f2179c604951.csv')
 
+# trend_type = ["perc", "gain", "tickets"]
+# offset: (numero fra 0 e 1) indica quanta percentuale di dati e' necessaria (e utilizzata) per fare la previsione (fissa che non varia anche se ci sono piu' dati a disposizione)
+# static_plot: True crea un grafico statico visualizzabile direttamente dentro powerbi, False uno dinamico visualizzabile sul browser
+# trend_type = "perc" mostra la percentuale di biglietti venduti, "gain" il guadagno cumulato, "tickets" il numero cumulato di biglietti venduti
 
-#pd.set_option("display.max_columns", None)
-
-def powerbi_visual2(dataset, static = True):
-
-    sales_cols = [
-        "Individuali/Gruppi",
-        "Tipologia canale",
-        "TOTAL_CURRENT_AMT_ITX",
-        "CURRENT_QUANTITY",
-        "REFERENCE_DATE",
-        "T_PRODUCT_ID",
-        "T_SEASON_ID",
-        "SEASON",
-        "T_PERFORMANCE_ID",
-        "OPERATION_TYPE",
-        "T_OPERATION_KIND",
-    ]
-
-    performances_cols = [
-        "T_PRODUCT_ID",
-        "T_PERFORMANCE_ID",
-        "PERFORMANCE_STATE",
-        "Tipologia spettacolo",
-        "SEASON",
-        "SPACE",
-        "PERFORMANCE_QUOTA",
-        "PRODUCT_DATE_TIME",
-    ]
-    seasons_cols = [
-        "FINE STAGIONE",
-        "FINE VENDITE",
-        "INIZIO STAGIONE",
-        "INIZIO VENDITE",
-        "SEASON.1",
-        "T_SEASON_ID",
-    ]
-    SALES = dataset[sales_cols].copy()
-    SALES = SALES.rename(columns={'SEASON.1': 'SEASON', "Individuali/Gruppi": "Individuali_Gruppi", "Tipologia canale": "Tipologia_canale"})
-    SALES.columns = ["D_SALES_LIST_SALES_"+col for col in SALES.columns]
-   
-    PRODUCTS = dataset[performances_cols].copy()
-    PRODUCTS = PRODUCTS.drop_duplicates()
-    PRODUCTS = PRODUCTS.rename(columns={'Tipologia spettacolo': 'Tipologia_spettacolo'})
-
-    PRODUCTS.columns = ["D_CONFIG_PROD_LIST_"+col for col in PRODUCTS.columns]
-
-    SEASONS = dataset[seasons_cols].copy()
-    SEASONS = SEASONS.drop_duplicates()
-    SEASONS = SEASONS.rename(columns={
-        "FINE STAGIONE": "fine_stagione",
-        "FINE VENDITE": "fine_vendite",
-        "INIZIO STAGIONE": "inizio_stagione",
-        "INIZIO VENDITE": "inizio_vendite",
-        "SEASON.1": "season_name",
-        "T_SEASON_ID": "season_id",
-    })
-    show_id = int(dataset["T_PRODUCT_ID"].iloc[0])
-
-    target_perc = float(dataset["OBIETTIVO RIEMPIMENTO"].iloc[0])
-    target_incasso = float(dataset["OBIETTIVO INCASSO"].iloc[0])
-    k = (target_incasso/target_perc)*100
-    product_name = dataset["PRODUCT_EXTERNAL_NAME"].iloc[-1]
-    
-    df = run_data_pipeline(SALES, PRODUCTS, SEASONS, show_id)
-
-    sales_duration = df["sales_duration"].iloc[0]
-
-    pd.set_option("display.max_columns", None)
-
-    offset = 0.3
-    known_trend = df["percentage_bought"].copy()
-
-    model = get_model("XGB_trend2")
-    future_prediction = predict_trend(df, model)
-    
-    if int(sales_duration * offset)<= len(df):
-        fixed_df = df.head(int(sales_duration * offset)).copy()
-        predicted_fixed_trend = predict_trend(fixed_df, model)
-        plt.plot(predicted_fixed_trend, color="green")
-
-
-    # Plotting
-    
-    plt.plot(known_trend, color="blue")
-    plt.plot(future_prediction, color="orange")
-    plt.show()
-
-
-powerbi_visual(dataset, offset=0.1, static=True, gain_trend=True)
+powerbi_visual(dataset, offset=0.1, static_plot=True, trend_type="gain")
