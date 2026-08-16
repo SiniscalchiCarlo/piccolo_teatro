@@ -132,4 +132,4 @@ The complete thesis—including the modelling rationale, feature definitions, ex
 
 ## Author
 
-Carlo Siniscalchi · MSc thesis project, Mathematical Engineering, Politecnico di Milano (2024–2025)
+Carlo Siniscalchi · Bachelor thesis project, Mathematical Engineering, Politecnico di Milano (2024–2025)
