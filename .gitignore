@@ -1,0 +1,29 @@
+# Local environment configuration
+.env
+.env.*
+!.env.example
+
+# Python-generated files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Test and profiling outputs
+.pytest_cache/
+.coverage
+htmlcov/
+/report.html
+/report.json
+
+# LaTeX build outputs
+tesi/*.aux
+tesi/*.fdb_latexmk
+tesi/*.fls
+tesi/*.log
+tesi/*.out
+tesi/*.synctex.gz
+tesi/*.toc
+
+# Local editor configuration
+.vscode/
+.idea/
